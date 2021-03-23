@@ -1,5 +1,5 @@
 import unittest as ut
-from HistData.HistData import HistData
+from HistData import HistData
 from threading import Event
 from datetime import datetime as dt
 from pandas import DataFrame
