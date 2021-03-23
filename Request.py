@@ -39,11 +39,7 @@ class Request_Maker:
         return contract, symbol
 
     def _set_request_dates(self, start, end):
-        if end is None:
-            nstart = dt.combine(start.date(), dtt(0))
-            end = nend = dt.combine(dt.now().date(), dtt(0)) +td(1)
-
-        elif start == end:
+        if start == end:
             start = nstart = dt.combine(start.date(), dtt(0))
             end = nend = dt.combine(end.date(), dtt(0)) +td(1)
 
@@ -66,6 +62,13 @@ class Request_Maker:
         else: duration = f"{diff//td(365)+ 1} Y"
 
         return ndays, duration
+
+    def calc_nreqs(self, tf, ndays):
+
+        tfdelta = self.ratios[tf[-1]]* int(tf[:-1])
+        nrows = ceil(ndays* self.ratios["D"]/tfdelta)
+        return  (nrows//5000)+1
+
 
     def _tf(self, tf):
         x = int(tf[:-1])
@@ -115,36 +118,28 @@ class Request_Manager(Request_Maker):
         else: return None, None
 
 
-    def makeRequest(self, symbol, timeframe, start, end= None, format_= 1,
+    def makeRequest(self, symbol, timeframe, start, end, format_= 1,
                     onlyRTH= False, type_= "TRADES", setDateasIndex= True, transmit= None):
-
-        oneday= False
+        # setting contract and symbol
         contract, symbol = self.makeContract(symbol)
-
-
+        # setting up nstart and nend, which will be used for the actual request
         start, end, nstart, nend = self._set_request_dates(start, end)
-        tfdelta = self.ratios[timeframe[-1]]* int(timeframe[:-1])
+        # get the number of tradingdays and the duration in IB format
         ndays, duration = self.date_duration(start, end)
+        # calc the number of ib requests necessary
+        nreqs = self.calc_nreqs(timeframe, ndays)
 
-        nrows = ceil(ndays* self.ratios["D"]/tfdelta)
-        nreqs = (nrows//5000)+1
-        timeframe = self._tf(timeframe)
 
-        if nreqs== 1:
-            theReq = Request(contract, timeframe,[(duration, self._ib(nend))], format_, int(onlyRTH), type_,
-                           start, end, setDateasIndex= setDateasIndex, oneday= oneday, orig_sym= symbol)
-        else:
-            add = (nend - nstart)/ nreqs
-            reqs = [nstart+add*i for i in range(nreqs)]
+        # create the combination of duration and enddate for each ib request
+        add, duration_end = (nend - nstart)/ nreqs, []
+        for i in range(nreqs):
+            thisstart = nstart+add*i; thisend = thisstart + add
+            duration_end.append(
+                (self.date_duration(thisstart, thisend)[1], self._ib(thisend)))
 
-            duration_end = []
-            for st in reqs:
-                thisend = st+add
-                ndays, duration = self.date_duration(st, thisend)
-                duration_end.append((duration, self._ib(thisend)))
-
-            theReq = Request(contract, timeframe, duration_end, format_, int(onlyRTH), type_,
-                           start, end, setDateasIndex= setDateasIndex, oneday= oneday, orig_sym= symbol)
+        # make the Request object
+        theReq = Request(contract, self._tf(timeframe), duration_end, format_, int(onlyRTH), type_,
+                           start, end, setDateasIndex= setDateasIndex, orig_sym= symbol)
 
         if not transmit:
             return theReq
@@ -160,27 +155,18 @@ class Request_Manager(Request_Maker):
             if self.directreturn:
                 if theReq.data.shape[0]: return theReq.data
                 else: return "No Data"
-            # TODO: Check the implications of blocking and not directreturn when someone doesn't
-            #  use their own event to make sure the response has arrived before continuing with the
-            #  code after this.
 
-
-    def _standardcsv(self, id_):
-        sym, tf = self.Reqs[id_].contract.symbol, self.Reqs[id_].timeframe
-        st, end = self._ib(self.Reqs[id_].start), self._ib(self.Reqs[id_].end)
-        fn = f"{sym}_{tf}_{st}_{end}.csv".replace(":","").replace(" ","")
-        return rf"{self.savefolder}\{fn}"
 
     def add(self, id_, bar):
+        """ adds a list of pricedata to the list of lists in Req.data"""
         self.Reqs[id_].data.append(
         [bar.date, bar.open, bar.high, bar.low, bar.close, bar.volume])
 
     def ishistdatareq(self, id_): return not isinstance(self.Reqs[id_], self.Stamp)
 
-    def markasfailed(self, id_):
-        self.Reqs[id_].Failed = True
+    def markasfailed(self, id_): self.Reqs[id_].Failed = True
 
-    def end(self, id_, save= False):
+    def end(self, id_):
         self.Reqs[id_].received += 1
         if self.Reqs[id_].received == self.Reqs[id_].nreqs:
 
@@ -188,26 +174,14 @@ class Request_Manager(Request_Maker):
             self.Reqs[id_].data = DF(self.Reqs[id_].data, columns= self.COLS)
             self.Reqs[id_].data = self.Reqs[id_].data.sort_values("Date").drop_duplicates("Date")
             self.Reqs[id_].data["Date"] = to_dt(self.Reqs[id_].data["Date"], infer_datetime_format= True)
-
-            # checking whether one day was requested to adjust the end cut off
-            if self.Reqs[id_].end.time() == dtt(0) and not self.Reqs[id_].oneday:
-                end = self.Reqs[id_].end + td(1)
+            # checking whether a date was requested to adjust the end cut off
+            if self.Reqs[id_].end.time() == dtt(0): end = self.Reqs[id_].end + td(1)
             else: end = self.Reqs[id_].end
-
             # here the actually requested dates are used to trim the df and Date set to index
             mask = (self.Reqs[id_].start<= self.Reqs[id_].data["Date"])& (self.Reqs[id_].data["Date"]< end)
             self.Reqs[id_].data = self.Reqs[id_].data[mask]
             if self.Reqs[id_].setDateasIndex:
                 self.Reqs[id_].data.set_index("Date", inplace= True)
-
-            # possibly saved
-            if save:
-                if save is True:
-                    self.Reqs[id_].data.to_csv(self._standardcsv(id_),
-                                              index= self.Reqs[id_].setDateasIndex)
-                elif save.endswith(".csv"):
-                    self.Reqs[id_].data.to_csv(fr"{self.savefolder}\{save}",
-                                              index= self.Reqs[id_].setDateasIndex)
 
             # either  nothing (directreturn) or return value in historicalDataEnd triggering self.response
             self.Reqs[id_].EndEvent.set()
@@ -222,11 +196,7 @@ class Request_Manager(Request_Maker):
 
     def tf_sym(self, id_):
         if id_ in self.Reqs:
-            if self.ishistdatareq(id_):
-                return self.Reqs[id_].timeframe, self.Reqs[id_].orig_sym
-            else:
-                return "stamp", self.Reqs[id_].sym
-
+            return self.Reqs[id_].timeframe, self.Reqs[id_].orig_sym
         else: return "Not a used id", "Not a used id"
 
 
@@ -234,7 +204,7 @@ class Request_Manager(Request_Maker):
 class Request:
 
     def __init__(self, contract, timeframe, duration_end, format_, onlyRTH,
-                 type_, start, end, setDateasIndex= True, oneday= False, orig_sym= None):
+                 type_, start, end, setDateasIndex= True, orig_sym= None):
         self.contract = contract
         self.timeframe = timeframe
         self.duration_end = duration_end
@@ -242,7 +212,6 @@ class Request:
         self.onlyRTH = onlyRTH
         self.type_ = type_
 
-        self.oneday = oneday
         self.orig_sym = orig_sym or contract.symbol
         self.start, self.end = start, end
         self.ToUnpack, self.data = [], []
@@ -266,18 +235,18 @@ class Stamp:
         self.req = req
         self.sym = sym
         self.event = event
+        self.timeframe = "stamp"
 
 class Response:
 
     def __init__(self, sym, tf, df):
         self.sym = sym
-        self.tf = tf
+        self.timeframe = tf
         self.df = df
 
         self.t_received = None
         self.errors = None
         self.timedout = False
-
 
 
 
