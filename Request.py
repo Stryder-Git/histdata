@@ -5,7 +5,7 @@ from pandas import DataFrame as DF, to_datetime as to_dt
 from itertools import count
 from pandas_market_calendars import get_calendar; nyse = get_calendar("NYSE")
 from threading import Event
-from collections import namedtuple
+from time import time
 
 
 class Request_Maker:
@@ -15,8 +15,7 @@ class Request_Maker:
     id = count(1)
     COLS = ["Date", "Open", "High", "Low", "Close", "Volume"]
     IBDT = "%Y%m%d %H:%M:%S"
-    Stamp = namedtuple("Stamp", ["req", "sym", "event"])
-
+    TIMEOUT = 150
     ibtfs = dict(s= "sec", m= "min", h= "hour", D= "day", W= "W", M= "M")
     validibtfs = "1 secs, 5 secs, 10 secs, 15 secs, 30 secs, 1 min, 2 mins, 3 mins, 5 mins, 10 mins, 15 mins, 20 mins," \
                  " 30 mins, 1 hour, 2 hours, 3 hours, 4 hours, 8 hours, 1 day, 1W, 1M".replace(", ", ",").split(",")
@@ -38,11 +37,10 @@ class Request_Maker:
         contract.exchange = "SMART"
         return contract, symbol
 
-    def _set_request_dates(self, start, end):
+    def set_request_dates(self, start, end):
         if start == end:
             start = nstart = dt.combine(start.date(), dtt(0))
             end = nend = dt.combine(end.date(), dtt(0)) +td(1)
-
         else:
             nstart = dt.combine(start.date(), dtt(0))
             nend = dt.combine(end.date(), dtt(0)) +td(1)
@@ -92,25 +90,28 @@ class Request_Manager(Request_Maker):
         self.threadwait = True
         self.directreturn = True
 
-
     def getHeadTimeStamp(self, symbol, type_= "TRADES", onlyRTH= False, format_= 1, transmit= None):
         contract, symbol = self.makeContract(symbol)
 
-        # set the namedtuple with: request args, symbol, and Event to be waited for
+        # set the Stamp with: request args, symbol, and Event to be waited for
         Req = Stamp([next(self.id), contract, type_, int(onlyRTH), format_], symbol, Event())
-        self.Reqs[Req.req[0]] = Req # adding the namedtuple to class.Reqs with its unique id as key
+        self.Reqs[Req.req[0]] = Req # adding the Stamp to class.Reqs with its unique id as key
 
         # the choice is between immediately transmitting and waiting for the response
         # or getting the request args as a list
         if transmit:
-            Req.event.clear()
+            if self.threadwait: Req.event.clear()
+
             transmit.reqHeadTimeStamp(*Req.req)
-            Req.event.wait()
-            if self.directreturn: return Req.req
-        else: return Req.req
+            if self.threadwait:
+                Req.event.wait()
+                if self.directreturn: return Req.req
+
+
+        else: return Req
 
     def receiveStamp(self, id_, stamp):
-        self.Reqs[id_].req= stamp
+        self.Reqs[id_].req = stamp
         self.Reqs[id_].event.set()
 
         if not self.directreturn:
@@ -120,15 +121,12 @@ class Request_Manager(Request_Maker):
 
     def makeRequest(self, symbol, timeframe, start, end, format_= 1,
                     onlyRTH= False, type_= "TRADES", setDateasIndex= True, transmit= None):
-        # setting contract and symbol
-        contract, symbol = self.makeContract(symbol)
-        # setting up nstart and nend, which will be used for the actual request
-        start, end, nstart, nend = self._set_request_dates(start, end)
-        # get the number of tradingdays and the duration in IB format
-        ndays, duration = self.date_duration(start, end)
-        # calc the number of ib requests necessary
-        nreqs = self.calc_nreqs(timeframe, ndays)
+        """ main access point of this Module"""
 
+        contract, symbol = self.makeContract(symbol)
+        start, end, nstart, nend = self.set_request_dates(start, end) # nend and nstart are for the request
+        ndays, duration = self.date_duration(start, end) # the duration for IB format
+        nreqs = self.calc_nreqs(timeframe, ndays) # necessary number of reqs
 
         # create the combination of duration and enddate for each ib request
         add, duration_end = (nend - nstart)/ nreqs, []
@@ -138,66 +136,28 @@ class Request_Manager(Request_Maker):
                 (self.date_duration(thisstart, thisend)[1], self._ib(thisend)))
 
         # make the Request object
-        theReq = Request(contract, self._tf(timeframe), duration_end, format_, int(onlyRTH), type_,
-                           start, end, setDateasIndex= setDateasIndex, orig_sym= symbol)
+        theReq = Request(contract, self._tf(timeframe), duration_end, format_, int(onlyRTH),
+                         type_, start, end, setDateasIndex= setDateasIndex, orig_sym= symbol)
 
-        if not transmit:
-            return theReq
-        else:
-            for req in theReq.ToUnpack:
-                if self.threadwait: theReq.EndEvent.clear()
+        if transmit:
+            return theReq.transmit_requests(transmit, self.threadwait, self.directreturn)
 
-                transmit.reqHistoricalData(*req)
-
-                if self.threadwait and not theReq.EndEvent.wait(150):
-                    transmit.historicalDataEnd(req[0], 0, "timed out")
-
-            if self.directreturn:
-                if theReq.data.shape[0]: return theReq.data
-                else: return "No Data"
+        else: return theReq
 
 
-    def add(self, id_, bar):
-        """ adds a list of pricedata to the list of lists in Req.data"""
-        self.Reqs[id_].data.append(
-        [bar.date, bar.open, bar.high, bar.low, bar.close, bar.volume])
+    def add(self, id_, bar): self[id_].addBar(bar)
 
-    def ishistdatareq(self, id_): return not isinstance(self.Reqs[id_], self.Stamp)
+    def ishistdatareq(self, id_): return not isinstance(self.Reqs[id_], Stamp)
 
-    def markasfailed(self, id_): self.Reqs[id_].Failed = True
-
-    def end(self, id_):
-        self.Reqs[id_].received += 1
-        if self.Reqs[id_].received == self.Reqs[id_].nreqs:
-
-            # this makes the dataframe, and sorts it
-            self.Reqs[id_].data = DF(self.Reqs[id_].data, columns= self.COLS)
-            self.Reqs[id_].data = self.Reqs[id_].data.sort_values("Date").drop_duplicates("Date")
-            self.Reqs[id_].data["Date"] = to_dt(self.Reqs[id_].data["Date"], infer_datetime_format= True)
-            # checking whether a date was requested to adjust the end cut off
-            if self.Reqs[id_].end.time() == dtt(0): end = self.Reqs[id_].end + td(1)
-            else: end = self.Reqs[id_].end
-            # here the actually requested dates are used to trim the df and Date set to index
-            mask = (self.Reqs[id_].start<= self.Reqs[id_].data["Date"])& (self.Reqs[id_].data["Date"]< end)
-            self.Reqs[id_].data = self.Reqs[id_].data[mask]
-            if self.Reqs[id_].setDateasIndex:
-                self.Reqs[id_].data.set_index("Date", inplace= True)
-
-            # either  nothing (directreturn) or return value in historicalDataEnd triggering self.response
-            self.Reqs[id_].EndEvent.set()
-            if not self.directreturn:
-                if self.Reqs[id_].data.shape[0]:
-                    return self.Reqs[id_].data
-                else: return "No Data"
-
-        else: self.Reqs[id_].EndEvent.set()
-
-    def Req(self, id_): return self.Reqs[id_]
+    def end(self, id_, err): return self[id_].setEnd(id_, err)
 
     def tf_sym(self, id_):
-        if id_ in self.Reqs:
-            return self.Reqs[id_].timeframe, self.Reqs[id_].orig_sym
-        else: return "Not a used id", "Not a used id"
+        try: return self[id_].timeframe, self[id_].orig_sym
+        except KeyError: return "Not a used id", "Not a used id"
+
+    def clear(self): self.Reqs.clear()
+
+    def __getitem__(self, id_): return self.Reqs[id_]
 
 
 
@@ -207,47 +167,145 @@ class Request:
                  type_, start, end, setDateasIndex= True, orig_sym= None):
         self.contract = contract
         self.timeframe = timeframe
-        self.duration_end = duration_end
-        self.format_= format_
-        self.onlyRTH = onlyRTH
-        self.type_ = type_
-
         self.orig_sym = orig_sym or contract.symbol
+
         self.start, self.end = start, end
-        self.ToUnpack, self.data = [], []
+        self.ToUnpack, self.ixlink, self.data = {}, [], []
         self.EndEvent = Event()
 
         for duration, end in duration_end:
             id_ = next(Request_Manager.id)
-            self.ToUnpack.append([id_, contract, end, duration, timeframe,
+            self.ToUnpack[id_] = IBRequest([id_, contract, end, duration, timeframe,
                           type_, onlyRTH, format_, False, []])
+            self.ixlink.append(id_)
             Request_Manager.Reqs[id_] = self
 
         self.nreqs, self.received = len(self.ToUnpack), 0
         self.setDateasIndex = setDateasIndex
-        self.Failed = False
+        self.Response = Response(orig_sym, timeframe)
+        self.directreturn = True
+        self.current = -1
+
+    def transmit_requests(self, transmitter, wait= True, direct= True):
+        """ loops over the IBRequests, possibly waiting and timing them"""
+        self.directreturn = direct
+        for id_, req in self:
+            if wait: self.EndEvent.clear()
+            req.t_requested = time()
+            transmitter.reqHistoricalData(*req)
+
+            if wait and not self.EndEvent.wait(Request_Manager.TIMEOUT):
+                self.setEnd(id_, "timed out")
+
+        if wait and direct: return self.Response
+
+    def addBar(self, bar):
+        """ appends the pricedata row as a list to the list of lists in Req.data"""
+        self.data.append(
+        [bar.date, bar.open, bar.high, bar.low, bar.close, bar.volume])
+
+    def setEnd(self, id_, err):
+        """ this method finalizes a transmitted request by taking the speed,
+        incrementing the received number, and saving potential errors.
+        If the last of the required requests has been reached, the df is made
+        and the Reponse object finished"""
+
+        self[id_].speed = time() - self[id_].t_requested
+        self.received += 1
+        self.Response._updspeed(self[id_].speed, self.received)
+        if err: self[id_].error = err; self.Response.nerrors += 1
+
+        if self.received == self.nreqs:
+            # this makes the dataframe, sorts it, drops duplicates and trims it
+            self.data = DF(self.data, columns=Request_Manager.COLS)
+            self.data["Date"] = to_dt(self.data["Date"], infer_datetime_format=True)
+            self.data = self.data.sort_values("Date").drop_duplicates("Date")
+            # if a date (no time) was requested, adjust the end cut off to include the whole day
+            if self.end.time() == dtt(0): end = self.end + td(1)
+            else: end = self.end
+            # trim it
+            mask = (self.start <= self.data["Date"]) & (self.data["Date"] < end)
+            self.data = self.data[mask]
+            if self.setDateasIndex: self.data.set_index("Date", inplace=True)
+
+            # finish the response object
+            self.Response.finalize(self.data, [self[i] for i in self.ixlink])
+            self.EndEvent.set()
+            # make it return None when directreturn is desired
+            if not self.directreturn: return self.Response
+
+        else: self.EndEvent.set()
 
 
+    def __getitem__(self, id_): return self.ToUnpack[id_]
+    def __iter__(self): return self
+    def __next__(self):
+        self.current += 1
+        if self.current == self.nreqs: raise StopIteration
+        id_ = self.ixlink[self.current]
+        return self.ToUnpack[id_].id_, self.ToUnpack[id_]
+
+
+class IBRequest:
+    """ only used to keep track of speed/errors for each request made to IB"""
+
+    def __init__(self, req):
+        self.req, self.id_ = req, req[0]
+        self.t_requested = self.speed = self.error = None
+
+    def __iter__(self): return iter(self.req)
+    def __repr__(self): return self.req
 
 class Stamp:
-
     def __init__(self, req, sym, event):
         self.req = req
+        self.orig_sym = sym
         self.sym = sym
         self.event = event
         self.timeframe = "stamp"
 
+
 class Response:
+    """ This is the object that will be returned either directly by
+    calling the Manager's getHistData method or through the overwritten
+    response method"""
 
-    def __init__(self, sym, tf, df):
+    def __init__(self, sym, tf):
         self.sym = sym
-        self.timeframe = tf
-        self.df = df
+        self.tf = tf
+        self.data = DF
+        self.nerrors = self.speed = self.nreqs = 0
+        self.requests, self.errors, self.success = [], [], False
 
-        self.t_received = None
-        self.errors = None
-        self.timedout = False
+    def _updspeed(self, speed, n): self.speed= (self.speed*(n-1)+ speed)/n
 
+    def finalize(self, data, reqs):
+        """ saves the returned data and sets the success attribute
+        if a dataframe was returned, it's considered a success
+        if not then its only a success if there are less errors than
+        requests"""
+
+        self.data = data
+        self.requests = reqs
+        self.nreqs = len(reqs)
+        if isinstance(data, DF) and data.shape[0]: self.success = True
+        else: self.success = self.nerrors < self.nreqs
+        if self.nerrors:
+            self.errors = self.return_errors(drop_duplicates= False)
+
+
+    def __bool__(self):
+        return self.success
+
+    def return_errors(self, withid= False, drop_duplicates= True):
+        if not withid:
+            errs = [r.error for r in self.requests if not r.error is None]
+            return list(set(errs)) if drop_duplicates else errs
+        else: return [(r.id_, r.error) for r in self.requests]
+
+    def return_speeds(self, withid= False):
+        if not withid: return [r.speed for r in self.requests]
+        else: return [(r.id_, r.speed) for r in self.requests]
 
 
 

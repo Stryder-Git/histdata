@@ -19,19 +19,27 @@ class HistDataTests(ut.TestCase, HistData):
         cls.failruns = [
             ("fb", "1m", dt(2005,4,1,15,23), dt(2005,4,12,11,15)),
         ]
-        cls.failresults = ["No Data"]
+        cls.failresults = [
+            ["No Data", "No Data"],
+        ]
+
+        # cls.headrequests = ["aer", "cs", "fcx",
+        #                     "wkhs", "pza", ]
+        # cls.headresults = ["20061121  14:30:00", "20010925  13:30:00", "19950710  13:30:00",
+        #                    "No head time stamp", "No head time stamp"]
+
+
 
         cls.responseEvent = Event()
         cls.received = {}
-
         class InnerTest(HistData):
             def __init__(self):
                 HistData.__init__(self, 5326)
-            def response(self, tf, sym, df):
-                if not isinstance(df, str):
-                    cls.received[sym] = (df.shape, df.index[0], df.index[-1])
+            def response(self, res):
+                if res:
+                    cls.received[res.sym] = (res.data.shape, res.data.index[0], res.data.index[-1])
                 else:
-                    cls.received[sym] = df
+                    cls.received[res.sym] = res.errors
                 cls.responseEvent.set()
 
         cls.inner = InnerTest()
@@ -43,7 +51,7 @@ class HistDataTests(ut.TestCase, HistData):
             self.responseEvent.clear()
             direct = self.inner.get(*test)
             self.responseEvent.wait()
-            self.assertIs(direct, None, "the directreturn should be None but isn't")
+            self.assertIsNone(direct, "the directreturn should be None but isn't")
             self.assertTupleEqual(self.received[test[0]], self.successresults[i])
 
         for i, test in enumerate(self.failruns):
@@ -51,7 +59,7 @@ class HistDataTests(ut.TestCase, HistData):
             direct = self.inner.get(*test)
             self.responseEvent.wait()
 
-            self.assertIs(direct, None, "the directreturn should be None but isn't")
+            self.assertIsNone(direct, "the directreturn should be None but isn't")
             self.assertEqual(self.received[test[0]], self.failresults[i])
 
     def test_Blocking(self):
@@ -61,18 +69,21 @@ class HistDataTests(ut.TestCase, HistData):
         for i, test in enumerate(self.successruns):
             direct = self.inner.get(*test)
             self.assertIsNotNone(direct,"the directreturn is None but shouldnt be")
-            self.assertTupleEqual((direct.shape, direct.index[0], direct.index[-1]),
+            self.assertTupleEqual((direct.data.shape, direct.data.index[0], direct.data.index[-1]),
                                   self.successresults[i])
 
         for i, test in enumerate(self.failruns):
             direct = self.inner.get(*test)
             self.assertIsNotNone(direct, "the directreturn is None but shouldnt be")
-            self.assertEqual(direct, self.failresults[i])
+            self.assertEqual(direct.errors, self.failresults[i])
 
+    #
+    # def test_HeadStamp(self):
+    #
 
 
 
 
 if __name__ == '__main__':
-    ut.main()
+    ut.main(verbosity= 2)
 
