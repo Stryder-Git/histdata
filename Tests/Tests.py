@@ -37,7 +37,7 @@ class HistDataTests(ut.TestCase, HistData):
                 HistData.__init__(self, 5326)
             def response(self, res):
                 if res:
-                    cls.received[res.sym] = (res.data.shape, res.data.index[0], res.data.index[-1])
+                    cls.received[res.sym] = (res.shape, res.start, res.end)
                 else:
                     cls.received[res.sym] = res.errors
                 cls.responseEvent.set()
@@ -69,7 +69,7 @@ class HistDataTests(ut.TestCase, HistData):
         for i, test in enumerate(self.successruns):
             direct = self.inner.get(*test)
             self.assertIsNotNone(direct,"the directreturn is None but shouldnt be")
-            self.assertTupleEqual((direct.data.shape, direct.data.index[0], direct.data.index[-1]),
+            self.assertTupleEqual((direct.shape, direct.start, direct.end),
                                   self.successresults[i])
 
         for i, test in enumerate(self.failruns):
@@ -77,13 +77,8 @@ class HistDataTests(ut.TestCase, HistData):
             self.assertIsNotNone(direct, "the directreturn is None but shouldnt be")
             self.assertEqual(direct.errors, self.failresults[i])
 
-    #
-    # def test_HeadStamp(self):
-    #
-
-
 
 
 if __name__ == '__main__':
-    ut.main(verbosity= 2)
+    ut.main()
 

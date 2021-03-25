@@ -67,19 +67,19 @@ class Request_Maker:
         nrows = ceil(ndays* self.ratios["D"]/tfdelta)
         return  (nrows//5000)+1
 
-
-    def _tf(self, tf):
+    @classmethod
+    def _tf(cls, tf):
         x = int(tf[:-1])
-        label = self.ibtfs[tf[-1]]
+        label = cls.ibtfs[tf[-1]]
 
         if x == 1: label = f"{x} {label}"
         else: label = f"{x} {label}s"
 
-        if not label in self.validibtfs:
-            raise ValueError(f"only the following tfs are allowed:\n{self.validibtfs}")
+        if not label in cls.validibtfs:
+            raise ValueError(f"only the following tfs are allowed:\n{cls.validibtfs}")
         return label
-
-    def _ib(self, dte): return dt.strftime(dte, self.IBDT)
+    @classmethod
+    def _ib(cls, dte): return dt.strftime(dte, cls.IBDT)
 
 
 
@@ -136,7 +136,7 @@ class Request_Manager(Request_Maker):
                 (self.date_duration(thisstart, thisend)[1], self._ib(thisend)))
 
         # make the Request object
-        theReq = Request(contract, self._tf(timeframe), duration_end, format_, int(onlyRTH),
+        theReq = Request(contract, timeframe, duration_end, format_, int(onlyRTH),
                          type_, start, end, setDateasIndex= setDateasIndex, orig_sym= symbol)
 
         if transmit:
@@ -166,7 +166,8 @@ class Request:
     def __init__(self, contract, timeframe, duration_end, format_, onlyRTH,
                  type_, start, end, setDateasIndex= True, orig_sym= None):
         self.contract = contract
-        self.timeframe = timeframe
+        self.timeframe = Request_Maker._tf(timeframe)
+        self.orig_tf = timeframe
         self.orig_sym = orig_sym or contract.symbol
 
         self.start, self.end = start, end
@@ -175,8 +176,9 @@ class Request:
 
         for duration, end in duration_end:
             id_ = next(Request_Manager.id)
-            self.ToUnpack[id_] = IBRequest([id_, contract, end, duration, timeframe,
-                          type_, onlyRTH, format_, False, []])
+            self.ToUnpack[id_] = IBRequest([id_, contract, end, duration,
+                                            self.timeframe, type_, onlyRTH,
+                                            format_, False, []])
             self.ixlink.append(id_)
             Request_Manager.Reqs[id_] = self
 
@@ -229,7 +231,7 @@ class Request:
             if self.setDateasIndex: self.data.set_index("Date", inplace=True)
 
             # finish the response object
-            self.Response.finalize(self.data, [self[i] for i in self.ixlink])
+            self.Response.finalize(self.orig_tf, self.data, [self[i] for i in self.ixlink])
             self.EndEvent.set()
             # make it return None when directreturn is desired
             if not self.directreturn: return self.Response
@@ -254,7 +256,7 @@ class IBRequest:
         self.t_requested = self.speed = self.error = None
 
     def __iter__(self): return iter(self.req)
-    def __repr__(self): return self.req
+    def __repr__(self): return str(self.req)
 
 class Stamp:
     def __init__(self, req, sym, event):
@@ -276,26 +278,30 @@ class Response:
         self.data = DF
         self.nerrors = self.speed = self.nreqs = 0
         self.requests, self.errors, self.success = [], [], False
+        self.start = self.end = self.shape = None
 
     def _updspeed(self, speed, n): self.speed= (self.speed*(n-1)+ speed)/n
 
-    def finalize(self, data, reqs):
+    def finalize(self, orig_tf, data, reqs):
         """ saves the returned data and sets the success attribute
         if a dataframe was returned, it's considered a success
         if not then its only a success if there are less errors than
         requests"""
-
+        self.tf = orig_tf
         self.data = data
         self.requests = reqs
         self.nreqs = len(reqs)
-        if isinstance(data, DF) and data.shape[0]: self.success = True
+        if isinstance(data, DF) and data.shape[0]:
+            self.success = True
+            self.shape = data.shape
+            if "Date" in data.columns:
+                self.start, self.end = data["Date"].iloc[[0,-1]]
+            else: self.start, self.end = data.index[[0, -1]]
+
         else: self.success = self.nerrors < self.nreqs
         if self.nerrors:
             self.errors = self.return_errors(drop_duplicates= False)
 
-
-    def __bool__(self):
-        return self.success
 
     def return_errors(self, withid= False, drop_duplicates= True):
         if not withid:
@@ -306,6 +312,12 @@ class Response:
     def return_speeds(self, withid= False):
         if not withid: return [r.speed for r in self.requests]
         else: return [(r.id_, r.speed) for r in self.requests]
+
+
+    def __bool__(self): return self.success
+    def __getitem__(self, ID):
+        for req in self.requests:
+            if req.id_ == ID: return req
 
 
 

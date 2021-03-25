@@ -11,7 +11,7 @@ testpd = Fetcher("cleaner_test")
 class GeneralTest(ut.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.cleaner = Cleaner(123465789)
+        cls.cleaner = Cleaner(clientid = 123465789)
 
         cls.efx = testpd.fetch("efx")
         cls.efxdates = Series([ddt(2010,1,15), ddt(2010,2,10), ddt(2010,2,11), ddt(2010,3,22)])

@@ -14,12 +14,19 @@ class HistData(EWrapper, EClient):
         self.R = Request_Manager()
         self.errors = Errors
         self.Block = True
+        self.IBTWSConnected = False
+        self.ImmediatelyCleanData = False
 
-    def nextValidId(self, id_): print("connected")
+    def nextValidId(self, id_): print("connected"); self.IBTWSConnected = True
     def error(self, id_, code, string):
         self.errors.info(f"{id_} {code} {self.R.tf_sym(id_)[1]}\n{string}")
+        print(f"{id_} {code}\n{string}")
 
-        if id_ != -1: print(f"{id_} {code}\n{string}")
+        if id_ == -1:
+            if "Connectivity between IB and Trader Workstation has been lost" in string:
+                self.IBTWSConnected = False
+            elif "Connectivity between IB and Trader Workstation has been restored" in string:
+                self.IBTWSConnected = True
 
         if "query returned no data" in string:
             self.historicalDataEnd(id_, code, "No Data")
@@ -28,6 +35,7 @@ class HistData(EWrapper, EClient):
             self.headTimestamp(id_, "No head time stamp")
 
         elif "No security definition" in string or "is ambiguous" in string:
+            if not self.IBTWSConnected: return
             if self.R.ishistdatareq(id_):
                 self.historicalDataEnd(id_, code, "invalid symbol")
             else:
@@ -40,7 +48,7 @@ class HistData(EWrapper, EClient):
                 self.headTimestamp(id_, "timed out")
 
         elif "Couldn't connect to TWS" in string or \
-            "Not connected" in string:
+                "Not connected" in string:
             exit()
 
     def headTimestamp(self, id_, stamp):
@@ -78,6 +86,13 @@ class HistData(EWrapper, EClient):
     def Blocking(self, directreturn= True):
         self.Block = True
         self.R.directreturn = directreturn
+
+    # def ImmediatelyClean(self, clean):
+    #     self.ImmediatelyCleanData = clean
+    #     self.R.immediatelycleandata = clean
+    #     self.Cleaner = self.Cleaner()
+
+
 
     def response(self, response):
         """ overwrite in child class """

@@ -1,7 +1,6 @@
-from Fetcher import Fetcher
 from pandas_market_calendars import get_calendar
 from numpy import unique
-from pandas import to_datetime, DataFrame as DF
+from pandas import to_datetime
 from datetime import time as dtt
 from collections import namedtuple
 
@@ -21,22 +20,22 @@ class Analyzer:
 
     def _getdates_counts(self, data):
         if not data.sym in self.dates_counts:
-            dates, counts = unique(data.df.loc[self.opent: self.closet].index.date,
-                                   return_counts= True)
+            dates, counts = unique(
+                data.df.loc[self.opent: self.closet].index.date, return_counts= True)
             self.dates_counts[data.sym] = dates.astype("datetime64[D]"), counts
         else:
             dates, counts = self.dates_counts[data.sym]
         return dates, counts
 
-    def Form(self, sym, df):
-        return self.Data(sym, df)
+    def Form(self, sym, df): return self.Data(sym, df)
 
     def Prepare(self, data, df= None):
         if not df is None: data = self.Form(data, df)
-
-        data.df["Date"] = to_datetime(data.df["Date"], infer_datetime_format= True)
-        df = data.df.drop_duplicates("Date").set_index("Date").sort_index()
-
+        if "Date" in data.df.columns:
+            data.df["Date"] = to_datetime(data.df["Date"], infer_datetime_format= True)
+            df = data.df.drop_duplicates("Date").set_index("Date").sort_index()
+        else:
+            df = data.df[~data.df.index.duplicated()].sort_index()
         data = data._replace(df= df)
         _ , _ = self._getdates_counts(data)
         return data
