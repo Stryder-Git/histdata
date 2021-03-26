@@ -3,6 +3,7 @@ from ibapi.client import EClient
 from threading import Thread
 from Cleaner.mylogging import Errors
 from Request import Request_Manager
+from Cleaner.Cleaner import Cleaner
 
 class HistData(EWrapper, EClient):
     ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out"]
@@ -16,6 +17,7 @@ class HistData(EWrapper, EClient):
         self.Block = True
         self.IBTWSConnected = False
         self.ImmediatelyCleanData = False
+        self.Cleaner = Cleaner(self)
 
     def nextValidId(self, id_): print("connected"); self.IBTWSConnected = True
     def error(self, id_, code, string):
@@ -52,15 +54,13 @@ class HistData(EWrapper, EClient):
             exit()
 
     def headTimestamp(self, id_, stamp):
-        stamp, sym = self.R.receiveStamp(id_, stamp)
-        if stamp is not None: self.response("stamp", sym, stamp)
-
+        resp = self.R.receiveStamp(id_, stamp, err= stamp in self.ErrResponses or None)
+        if not resp is None: self.response(resp)
 
     def historicalData(self, id_, bar): self.R.add(id_, bar)
 
     def historicalDataEnd(self, id_, start, end):
-        err = end if end in self.ErrResponses else None
-        response = self.R.end(id_, err)
+        response = self.R.end(id_, end if end in self.ErrResponses else None)
         if not response is None: self.response(response)
 
 
@@ -68,8 +68,12 @@ class HistData(EWrapper, EClient):
             type_= "TRADES", setDateasIndex= True, transmit= None):
         if transmit is None: transmit = self
         if self.Block or not transmit:
-            return self.R.makeRequest(symbol, timeframe, start, end, format_,
+            res = self.R.makeRequest(symbol, timeframe, start, end, format_,
                                       onlyRTH, type_,setDateasIndex, transmit)
+
+            if self.ImmediatelyCleanData and self.R.isResponse(res):
+                res = self.CleanResponse(res)
+            return res
         else:
             Thread(target= self.R.makeRequest,
                    args= [symbol, timeframe, start, end, format_,
@@ -87,12 +91,14 @@ class HistData(EWrapper, EClient):
         self.Block = True
         self.R.directreturn = directreturn
 
-    # def ImmediatelyClean(self, clean):
-    #     self.ImmediatelyCleanData = clean
-    #     self.R.immediatelycleandata = clean
-    #     self.Cleaner = self.Cleaner()
+    def ImmediatelyClean(self, clean): self.ImmediatelyCleanData = clean
 
-
+    def CleanResponse(self, res, clear_cache= True):
+        to_clean = self.Cleaner.Prepare(res.sym, res.data)
+        to_clean = self.Cleaner.FillMissingData(to_clean)
+        if clear_cache: self.Cleaner.clear_cache(to_clean)
+        res.data = to_clean.df
+        return res
 
     def response(self, response):
         """ overwrite in child class """

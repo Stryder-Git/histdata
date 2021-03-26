@@ -85,38 +85,20 @@ class Request_Maker:
 
 class Request_Manager(Request_Maker):
     Reqs = {}
+    @staticmethod
+    def isResponse(obj): return isinstance(obj, Response)
 
-    def __init__(self):
-        self.threadwait = True
-        self.directreturn = True
+    def __init__(self): self.threadwait = True; self.directreturn = True
 
     def getHeadTimeStamp(self, symbol, type_= "TRADES", onlyRTH= False, format_= 1, transmit= None):
         contract, symbol = self.makeContract(symbol)
-
         # set the Stamp with: request args, symbol, and Event to be waited for
-        Req = Stamp([next(self.id), contract, type_, int(onlyRTH), format_], symbol, Event())
-        self.Reqs[Req.req[0]] = Req # adding the Stamp to class.Reqs with its unique id as key
+        Req = Stamp([next(self.id), contract, type_, int(onlyRTH), format_], symbol)
 
-        # the choice is between immediately transmitting and waiting for the response
-        # or getting the request args as a list
-        if transmit:
-            if self.threadwait: Req.event.clear()
-
-            transmit.reqHeadTimeStamp(*Req.req)
-            if self.threadwait:
-                Req.event.wait()
-                if self.directreturn: return Req.req
-
-
+        if transmit: return Req.transmit(transmit, self.threadwait, self.directreturn)
         else: return Req
 
-    def receiveStamp(self, id_, stamp):
-        self.Reqs[id_].req = stamp
-        self.Reqs[id_].event.set()
-
-        if not self.directreturn:
-            return stamp, self.Reqs[id_].sym
-        else: return None, None
+    def receiveStamp(self, id_, stamp, err= False): return self[id_].receiveStamp(stamp, err)
 
 
     def makeRequest(self, symbol, timeframe, start, end, format_= 1,
@@ -184,7 +166,7 @@ class Request:
 
         self.nreqs, self.received = len(self.ToUnpack), 0
         self.setDateasIndex = setDateasIndex
-        self.Response = Response(orig_sym, timeframe)
+        self.Response = Response(orig_sym, self.orig_tf)
         self.directreturn = True
         self.current = -1
 
@@ -212,11 +194,8 @@ class Request:
         If the last of the required requests has been reached, the df is made
         and the Reponse object finished"""
 
-        self[id_].speed = time() - self[id_].t_requested
+        self[id_]._finalize_individual_request(err)
         self.received += 1
-        self.Response._updspeed(self[id_].speed, self.received)
-        if err: self[id_].error = err; self.Response.nerrors += 1
-
         if self.received == self.nreqs:
             # this makes the dataframe, sorts it, drops duplicates and trims it
             self.data = DF(self.data, columns=Request_Manager.COLS)
@@ -231,7 +210,7 @@ class Request:
             if self.setDateasIndex: self.data.set_index("Date", inplace=True)
 
             # finish the response object
-            self.Response.finalize(self.orig_tf, self.data, [self[i] for i in self.ixlink])
+            self.Response.finalize(self.data, [self[i] for i in self.ixlink])
             self.EndEvent.set()
             # make it return None when directreturn is desired
             if not self.directreturn: return self.Response
@@ -255,16 +234,40 @@ class IBRequest:
         self.req, self.id_ = req, req[0]
         self.t_requested = self.speed = self.error = None
 
+    def _finalize_individual_request(self, err):
+        self.speed = time() - self.t_requested
+        self.error = err
+
     def __iter__(self): return iter(self.req)
     def __repr__(self): return str(self.req)
 
 class Stamp:
-    def __init__(self, req, sym, event):
-        self.req = req
-        self.orig_sym = sym
-        self.sym = sym
-        self.event = event
+    def __init__(self, req, sym):
+        self.req = IBRequest(req)
+        self.orig_sym = self.sym = sym
+        self.event = Event()
         self.timeframe = "stamp"
+        self.directreturn = True
+        self.Response = Response(sym, self.timeframe)
+        Request_Manager.Reqs[self.req.id_] = self
+
+    def transmit(self, transmitter, wait= True, direct= True):
+        self.directreturn = direct
+        if wait: self.event.clear()
+        self.req.t_requested = time()
+        transmitter.reqHeadTimeStamp(*self.req)
+        if wait and not self.event.wait(Request_Manager.TIMEOUT):
+            self.receiveStamp("timed out", True)
+
+        if wait and direct: return self.Response
+
+    def receiveStamp(self, stamp, err):
+        if err: err = stamp
+        self.req._finalize_individual_request(err)
+        self.Response.finalize(stamp, [self.req])
+        self.event.set()
+        if not self.directreturn: return self.Response
+
 
 
 class Response:
@@ -282,15 +285,19 @@ class Response:
 
     def _updspeed(self, speed, n): self.speed= (self.speed*(n-1)+ speed)/n
 
-    def finalize(self, orig_tf, data, reqs):
+    def finalize(self, data, reqs):
         """ saves the returned data and sets the success attribute
         if a dataframe was returned, it's considered a success
         if not then its only a success if there are less errors than
         requests"""
-        self.tf = orig_tf
         self.data = data
         self.requests = reqs
         self.nreqs = len(reqs)
+        self.errors = self.return_errors(drop_duplicates= False)
+        self.nerrors = len(self.errors)
+        self.speed = self.return_speeds()
+        self.speed = sum(self.speed)/len(self.speed)
+
         if isinstance(data, DF) and data.shape[0]:
             self.success = True
             self.shape = data.shape
@@ -299,8 +306,6 @@ class Response:
             else: self.start, self.end = data.index[[0, -1]]
 
         else: self.success = self.nerrors < self.nreqs
-        if self.nerrors:
-            self.errors = self.return_errors(drop_duplicates= False)
 
 
     def return_errors(self, withid= False, drop_duplicates= True):
