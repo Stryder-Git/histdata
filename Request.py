@@ -293,6 +293,7 @@ class Response:
         self.data = data
         self.requests = reqs
         self.nreqs = len(reqs)
+
         self.errors = self.return_errors(drop_duplicates= False)
         self.nerrors = len(self.errors)
         self.speed = self.return_speeds()

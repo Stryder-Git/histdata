@@ -38,20 +38,14 @@ class HistData(EWrapper, EClient):
 
         elif "No security definition" in string or "is ambiguous" in string:
             if not self.IBTWSConnected: return
-            if self.R.ishistdatareq(id_):
-                self.historicalDataEnd(id_, code, "invalid symbol")
-            else:
-                self.headTimestamp(id_, "invalid symbol")
+            if self.R.ishistdatareq(id_): self.historicalDataEnd(id_, code, "invalid symbol")
+            else: self.headTimestamp(id_, "invalid symbol")
 
         elif "Request Timed Out" in string:
-            if self.R.ishistdatareq(id_):
-                self.historicalDataEnd(id_, code, "timed out")
-            else:
-                self.headTimestamp(id_, "timed out")
+            if self.R.ishistdatareq(id_): self.historicalDataEnd(id_, code, "timed out")
+            else: self.headTimestamp(id_, "timed out")
 
-        elif "Couldn't connect to TWS" in string or \
-                "Not connected" in string:
-            exit()
+        elif "Couldn't connect to TWS" in string or "Not connected" in string: exit()
 
     def headTimestamp(self, id_, stamp):
         resp = self.R.receiveStamp(id_, stamp, err= stamp in self.ErrResponses or None)

@@ -5,12 +5,16 @@ from pandas import Series
 from Cleaner.Cleaner import Cleaner
 from Fetcher import Fetcher
 
-
 testpd = Fetcher("cleaner_test")
-
 class GeneralTest(ut.TestCase):
+    """ This test is appropriate for testing the cleaner as a standalone module, which will then
+    automatically instantiate and use a new instance of the HistData class for it's data requests"""
+
     @classmethod
     def setUpClass(cls) -> None:
+        """ This sets up the data to be cleaned in the testruns. They are stored in the 'cleaner_test'
+        database and will have 4 dates removed. EFX will also have a few hours cut out of a day to check
+        the filling of incomplete days"""
         cls.cleaner = Cleaner(clientid = 123465789)
 
         cls.efx = testpd.fetch("efx")
