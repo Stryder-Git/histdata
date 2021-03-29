@@ -1,9 +1,9 @@
 import unittest as ut
 from HistData import HistData
 from threading import Event
-from datetime import datetime as dt
-from pandas import DataFrame
+from datetime import datetime as dt, date as ddt
 from time import sleep
+from pandas import Series
 
 class HistDataTests_WithoutCleaning(ut.TestCase, HistData):
     """ These tests check if the response object, and the (not)blocking/directreturn
@@ -179,9 +179,33 @@ class HistDataTests_WithCleaning(ut.TestCase, HistData):
     """ Here, mainly the use of the CleanResponse method in HistData is tested:
     This will be the manual use, after receiving the uncleaned response when ImmediatelyClean
     is set to False and the automatic use when ImmediatelyClean is set to True """
+    def remove_dates_from_test_data(self, acic, efx, qtt):
+        pass
+
+
     @classmethod
     def setUpClass(cls) -> None:
-        pass
+        cls.start_end = {"acic": (dt(2020,12,18), dt(2021,2,12)),
+                         "efx": (dt(2010,1,4), dt(2010,3,29)),
+                         "qtt": (dt(2018,10,2, 2018,12,28))}
+
+        cls.efxdates = Series([ddt(2010,1,15), ddt(2010,2,10), ddt(2010,2,11), ddt(2010,3,22)])
+        cls.efxinc = dt(2010,2,2, 11,45), dt(2010,2,2, 15,30)
+
+        cls.acicdates = Series([ddt(2020,12,29), ddt(2021,1,14), ddt(2021,1,15), ddt(2021,2,10)])
+
+        cls.qttdates = Series([ddt(2018,10,18), ddt(2018,11,19), ddt(2018,11,20), ddt(2018,12,6)])
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
