@@ -85,7 +85,7 @@ class HistData(EWrapper, EClient):
         self.Block = True
         self.R.directreturn = directreturn
 
-    def ImmediatelyClean(self, clean): self.ImmediatelyCleanData = clean
+    def setImmediatelyCleanTo(self, clean): self.ImmediatelyCleanData = clean
 
     def CleanResponse(self, res, clear_cache= True):
         to_clean = self.Cleaner.Prepare(res.sym, res.data)

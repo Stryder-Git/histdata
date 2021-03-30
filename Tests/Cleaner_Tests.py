@@ -1,12 +1,15 @@
 import unittest as ut
-from datetime import datetime as dt, timedelta as td, time as dtt, date as ddt
-from pandas import Series
+from datetime import datetime as dt, date as ddt
 
 from Cleaner.Cleaner import Cleaner
 from Fetcher import Fetcher
+from pandas import Series
+
+
+
 
 testpd = Fetcher("cleaner_test")
-class GeneralTest(ut.TestCase):
+class Cleaner_Test(ut.TestCase):
     """ This test is appropriate for testing the cleaner as a standalone module, which will then
     automatically instantiate and use a new instance of the HistData class for it's data requests"""
 
@@ -90,8 +93,3 @@ class GeneralTest(ut.TestCase):
 
 
 
-
-
-if __name__ == "__main__":
-
-    ut.main()
