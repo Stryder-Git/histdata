@@ -17,6 +17,7 @@ class Cleaner(Analyzer):
                 raise ValueError("clientid must be specified")
             from HistData import HistData
             self.hd = HistData(clientid)
+            self.hd.Blocking(True)
 
         else: self.hd = HistData
         if not self.hd.Block: raise ValueError("HistData instance must be blocking")
@@ -97,17 +98,23 @@ class Cleaner(Analyzer):
         over the dateranges. After the first loop, it will check if there are any new missing,
         incomplete dates and then request those again."""
         self.validsymbol = True
+        original_clean = self.hd.ImmediatelyCleanData
+        self.hd.setImmediatelyCleanTo(False)
+
         tofill = self.DatesToFill(data)
         self.missingdates.info(f"{data.sym}:\n{tofill}")
         self.datatoconcat[data.sym] = []
         if not tofill:
             self.validsymbol = False
             print("\nnothing to fill: ", len(tofill), "\n")
+            self.hd.setImmediatelyCleanTo(original_clean)
             return data
 
         nreqs = len(tofill); updlst =[]
         for nupd, dates in enumerate(tofill):
-            if not self.validsymbol: return data
+            if not self.validsymbol:
+                self.hd.setImmediatelyCleanTo(original_clean)
+                return data
             self.getData(data, "1m", *self._conv(*dates))
 
             if upd := ((nupd + 1) / nreqs // .1):
@@ -127,6 +134,8 @@ class Cleaner(Analyzer):
             for d in issues: self.getData(data, "1m", *self._conv(d, d))
 
             newdf = self.concatandcheck(newdf, data.sym, "now")[0]
+
+        self.hd.setImmediatelyCleanTo(original_clean)
         return data._replace(df = newdf)
 
     def concatandcheck(self, df, sym, stage):

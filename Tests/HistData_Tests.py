@@ -206,6 +206,7 @@ class HistDataTests_WithCleaning(ut.TestCase):
         }
         cls.hd = HistData(141654313)
         sleep(3)
+        print("\nmaking large requests")
         cls.responses = {sym: cls.hd.get(sym, "1m", *datedct["start_end"]) for sym, datedct in cls.adjust.items()}
 
     def test_CleanResponse(self):
@@ -270,29 +271,40 @@ class HistDataTests_WithCleaning(ut.TestCase):
         self.hd.R.makeRequest = original_makeRequest
         self.hd.Cleaner = original_Cleaner
 
-# TODO: Not sure how its possible but seem to be getting an infinite loop when running this
-# TODO: Probably because the cleaner also uses the Mock object instead of the real makeRequest method....
-    # def test_Cleaner_with_mock_data(self):
-    #     """ This test replaces the MakeRequest response data with the data where some dates are removed to run it
-    #     through the automatically called Cleaner methods"""
-    #     self.hd.Blocking(True)
-    #     self.hd.setImmediatelyCleanTo(True)
-    #     original_makeRequest = self.hd.R.makeRequest
-    #
-    #     for sym, datedct in self.adjust.items():
-    #         dates = datedct["dates"]
-    #         self.responses[sym].data = self.remove_dates_from_test_data(sym, self.responses[sym].data)
-    #         self.hd.R.makeRequest = Mock(return_value= self.responses[sym])
-    #
-    #         resp = self.hd.get(sym, "1m", *datedct["start_end"])
-    #         in_ = dates.isin(resp.data.index.date)
-    #         self.assertTrue(in_.all(), f"{sym}: dates weren't added: {dates[~in_]}")
-    #
-    #         # check if cache of cleaner is empty
-    #         self.assertEqual(len(self.hd.Cleaner.dates_counts), 0, f"{sym}: dates_counts cache wasn't cleared")
-    #         self.assertEqual(len(self.hd.Cleaner.datatoconcat), 0, f"{sym}: datatoconcat cache wasn't cleared")
-    #
-    #     self.hd.R.makeRequest = original_makeRequest
+
+    def test_Cleaner_with_mock_data(self):
+        """ This test replaces the MakeRequest response data with the data where some dates are removed to run it
+        through the automatically called Cleaner methods"""
+        self.hd.Blocking(True)
+        self.hd.setImmediatelyCleanTo(True)
+        original_makeRequest = self.hd.R.makeRequest
+
+        class makeRequest_Mock:
+            def __init__(self, when_to_mock, method_to_call, mock_return):
+                self.counter = 0
+                self.when_to_mock = when_to_mock
+                self.method_to_call = method_to_call
+                self.mock_return = mock_return
+            def to_call(self, *args, **kwargs):
+                self.counter += 1
+                if self.counter in self.when_to_mock: return self.mock_return
+                else: return self.method_to_call(*args, **kwargs)
+
+        for sym, datedct in self.adjust.items():
+            dates = datedct["dates"]
+            self.responses[sym].data = self.remove_dates_from_test_data(sym, self.responses[sym].data)
+            self.hd.R.makeRequest = Mock(
+                side_effect= makeRequest_Mock([1], original_makeRequest, self.responses[sym]).to_call)
+
+            resp = self.hd.get(sym, "1m", *datedct["start_end"])
+            in_ = dates.isin(resp.data.index.date)
+            self.assertTrue(in_.all(), f"{sym}: dates weren't added: {dates[~in_]}")
+
+            # check if cache of cleaner is empty
+            self.assertEqual(len(self.hd.Cleaner.dates_counts), 0, f"{sym}: dates_counts cache wasn't cleared")
+            self.assertEqual(len(self.hd.Cleaner.datatoconcat), 0, f"{sym}: datatoconcat cache wasn't cleared")
+
+        self.hd.R.makeRequest = original_makeRequest
 
 
 
