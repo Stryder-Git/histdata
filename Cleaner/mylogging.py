@@ -1,7 +1,7 @@
 from logging import getLogger, Formatter, FileHandler, INFO
 from datetime import datetime as dt
-FMissingDates = r"C:\Users\User\Desktop\Python\TradeCode\TWS_SPY_Data\Cleaner\ignore\logs\MissingDates.log"
-FErrors = r"C:\Users\User\Desktop\Python\TradeCode\TWS_SPY_Data\Cleaner\ignore\logs\Errors.log"
+FMissingDates = r"C:\Users\User\Desktop\Python\TradeCode\TWS_SPY_Data\ignore\CleanerLogs\MissingDates.log"
+FErrors = r"C:\Users\User\Desktop\Python\TradeCode\TWS_SPY_Data\ignore\CleanerLogs\Errors.log"
 
 time = dt.strftime(dt.now(), "%Y-%m-%d %H:%M")
 format_ = Formatter(f"%(name)s: {time}\n%(message)s")
