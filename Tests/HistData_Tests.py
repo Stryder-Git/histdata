@@ -1,15 +1,29 @@
 import unittest as ut
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from HistData import HistData
-from Request import Response
+from Request import Event, Response, Request
 from threading import Event
 from datetime import datetime as dt, date as ddt
 from time import sleep
 
+
 from pandas import Series
 
 
-class HistDataTests_WithoutCleaning(ut.TestCase, HistData):
+class Custom_Mock:
+    def __init__(self, when_to_mock, original_to_call, mock_return):
+        self.counter = 0
+        self.when_to_mock = when_to_mock
+        self.original_to_call = original_to_call
+        self.mock_return = mock_return
+
+    def to_call(self, *args, **kwargs):
+        self.counter += 1
+        if self.counter in self.when_to_mock: return self.mock_return
+        else: return self.original_to_call(*args, **kwargs)
+
+
+class Without_Cleaning(ut.TestCase, HistData):
     """ These tests check if the response object, and the (not)blocking/directreturn
     combinations work as they should in their most common usage. The response object is
     checked in the different blocking/return combinations, partially implicitly"""
@@ -178,8 +192,7 @@ class HistDataTests_WithoutCleaning(ut.TestCase, HistData):
             self.assertIsInstance(direct.speed, float, f"speed is not a float in {test}")
 
 
-
-class HistDataTests_WithCleaning(ut.TestCase):
+class With_Cleaning(ut.TestCase):
     """ Here, mainly the use of the CleanResponse method in HistData is tested:
     The manual use, after receiving the uncleaned response when ImmediatelyClean is set to False
     and the automatic use when ImmediatelyClean is set to True """
@@ -279,22 +292,11 @@ class HistDataTests_WithCleaning(ut.TestCase):
         self.hd.setImmediatelyCleanTo(True)
         original_makeRequest = self.hd.R.makeRequest
 
-        class makeRequest_Mock:
-            def __init__(self, when_to_mock, method_to_call, mock_return):
-                self.counter = 0
-                self.when_to_mock = when_to_mock
-                self.method_to_call = method_to_call
-                self.mock_return = mock_return
-            def to_call(self, *args, **kwargs):
-                self.counter += 1
-                if self.counter in self.when_to_mock: return self.mock_return
-                else: return self.method_to_call(*args, **kwargs)
-
         for sym, datedct in self.adjust.items():
             dates = datedct["dates"]
             self.responses[sym].data = self.remove_dates_from_test_data(sym, self.responses[sym].data)
             self.hd.R.makeRequest = Mock(
-                side_effect= makeRequest_Mock([1], original_makeRequest, self.responses[sym]).to_call)
+                side_effect= Custom_Mock([1], original_makeRequest, self.responses[sym]).to_call)
 
             resp = self.hd.get(sym, "1m", *datedct["start_end"])
             in_ = dates.isin(resp.data.index.date)
@@ -305,6 +307,39 @@ class HistDataTests_WithCleaning(ut.TestCase):
             self.assertEqual(len(self.hd.Cleaner.datatoconcat), 0, f"{sym}: datatoconcat cache wasn't cleared")
 
         self.hd.R.makeRequest = original_makeRequest
+
+
+class Break_HistData(ut.TestCase):
+    """When threadingEvent times out, the received counter increments.
+    This causes a premature finalization and return of the response object if
+    the request (that took too long) still arrives. (it would increment twice)
+
+    This is a test for the solution, which is the blacklisting of the id of the request
+    that times out, and not calling the add/end/received timestamp methods if a response
+    is eventually received.
+    """
+    def test_price_data(self):
+
+        hd = HistData(348145431343543)
+        sleep(3)
+        original_wait = Event.wait
+
+        Request.e.wait = Mock(side_effect= Custom_Mock([1], original_wait, False).to_call)
+
+        resp = hd.get("aapl", "1m", dt(2021,3,22), dt.now())
+
+        print(resp.speed, resp.errors)
+        hd.disconnect()
+
+
+
+
+
+
+
+
+
+
 
 
 

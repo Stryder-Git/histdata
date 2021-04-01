@@ -7,7 +7,6 @@ from pandas_market_calendars import get_calendar; nyse = get_calendar("NYSE")
 from threading import Event
 from time import time
 
-
 class Request_Maker:
     """ holds variables and methods needed to set up the requests"""
 
@@ -15,7 +14,6 @@ class Request_Maker:
     id = count(1)
     COLS = ["Date", "Open", "High", "Low", "Close", "Volume"]
     IBDT = "%Y%m%d %H:%M:%S"
-    TIMEOUT = 150
     ibtfs = dict(s= "sec", m= "min", h= "hour", D= "day", W= "W", M= "M")
     validibtfs = "1 secs, 5 secs, 10 secs, 15 secs, 30 secs, 1 min, 2 mins, 3 mins, 5 mins, 10 mins, 15 mins, 20 mins," \
                  " 30 mins, 1 hour, 2 hours, 3 hours, 4 hours, 8 hours, 1 day, 1W, 1M".replace(", ", ",").split(",")
@@ -84,7 +82,14 @@ class Request_Maker:
 
 
 class Request_Manager(Request_Maker):
+    from Cleaner.mylogging import Blcklist
     Reqs = {}
+    BLACKLIST = []
+    TIMEOUT = 300
+
+    @classmethod
+    def setTimeOut(cls, seconds): cls.TIMEOUT = seconds
+
     @staticmethod
     def isResponse(obj): return isinstance(obj, Response)
 
@@ -98,7 +103,8 @@ class Request_Manager(Request_Maker):
         if transmit: return Req.transmit(transmit, self.threadwait, self.directreturn)
         else: return Req
 
-    def receiveStamp(self, id_, stamp, err= False): return self[id_].receiveStamp(stamp, err)
+    def receiveStamp(self, id_, stamp, err= False):
+        if not self._blacklist(id_): return self[id_].receiveStamp(stamp, err)
 
 
     def makeRequest(self, symbol, timeframe, start, end, format_= 1,
@@ -127,11 +133,23 @@ class Request_Manager(Request_Maker):
         else: return theReq
 
 
-    def add(self, id_, bar): self[id_].addBar(bar)
+    def add(self, id_, bar):
+        if not self._blacklist(id_, pricedata= True): self[id_].addBar(bar)
+
 
     def ishistdatareq(self, id_): return not isinstance(self.Reqs[id_], Stamp)
 
-    def end(self, id_, err): return self[id_].setEnd(id_, err)
+    def end(self, id_, err):
+        if not self._blacklist(id_): return self[id_].setEnd(id_, err)
+
+    def _blacklist(self, id_, pricedata= False):
+        if not id_ in self.BLACKLIST: return False
+        elif not pricedata:
+            self.Blcklist.info(f"{self[id_].orig_sym}: {self[id_].orig_tf} @{self[id_][id_].t_requested}\n"
+                               f"request: {self[id_][id_].req}\n"
+                               f"was received after {time() - self[id_][id_].t_requested}s but TIMEOUT was {self.TIMEOUT}")
+        return True
+
 
     def tf_sym(self, id_):
         try: return self[id_].timeframe, self[id_].orig_sym
@@ -177,8 +195,8 @@ class Request:
             if wait: self.EndEvent.clear()
             req.t_requested = time()
             transmitter.reqHistoricalData(*req)
-
             if wait and not self.EndEvent.wait(Request_Manager.TIMEOUT):
+                Request_Manager.BLACKLIST.append(id_)
                 self.setEnd(id_, "timed out")
 
         if wait and direct: return self.Response
@@ -226,7 +244,6 @@ class Request:
         id_ = self.ixlink[self.current]
         return self.ToUnpack[id_].id_, self.ToUnpack[id_]
 
-
 class IBRequest:
     """ only used to keep track of speed/errors for each request made to IB"""
 
@@ -257,6 +274,7 @@ class Stamp:
         self.req.t_requested = time()
         transmitter.reqHeadTimeStamp(*self.req)
         if wait and not self.event.wait(Request_Manager.TIMEOUT):
+            Request_Manager.BLACKLIST.append(self.req.id_)
             self.receiveStamp("timed out", True)
 
         if wait and direct: return self.Response

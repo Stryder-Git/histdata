@@ -1,12 +1,19 @@
-num = 0
-while num >= 0:
-    num = int(input('Enter an integer (negative to quit):\n'))
+from HistData import HistData
+hd = HistData(34312213)
+from datetime import datetime as dt
+from time import sleep
 
-    if num >= 0:
-        print('Depicted graphically:')
-        for i in range(num//5):
-            print('*', end=' ')
-        print('\n')
+resp = hd.get("aapl", "1m", dt(2021,3,18), dt.now())
 
-print('Goodbye.')
+print(resp.speed, resp.errors)
 
+print(hd.R.TIMEOUT, id(hd.R.TIMEOUT), id(hd.R),"\n")
+hd.R.setTimeOut(0.0001)
+print(hd.R.TIMEOUT, id(hd.R.TIMEOUT), id(hd.R),"\n")
+
+resp = hd.get("aapl", "1m", dt(2021,3,18), dt.now())
+print(resp.speed, resp.errors)
+print(hd.R.BLACKLIST)
+sleep(150)
+hd.disconnect()
+exit()
