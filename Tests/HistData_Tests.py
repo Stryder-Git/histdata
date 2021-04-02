@@ -1,26 +1,26 @@
 import unittest as ut
 from unittest.mock import Mock, patch
 from HistData import HistData
-from Request import Event, Response, Request
+from Request import Response
 from threading import Event
-from datetime import datetime as dt, date as ddt
+from datetime import datetime as dt, date as ddt, timedelta as td
 from time import sleep
-
-
 from pandas import Series
 
 
-class Custom_Mock:
-    def __init__(self, when_to_mock, original_to_call, mock_return):
+class Side_Effect:
+    def __init__(self, mock_when_what, original_to_call):
+        self.when_to_mock = mock_when_what.keys()
+        self.mock_return = mock_when_what
         self.counter = 0
-        self.when_to_mock = when_to_mock
         self.original_to_call = original_to_call
-        self.mock_return = mock_return
 
-    def to_call(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs):
         self.counter += 1
-        if self.counter in self.when_to_mock: return self.mock_return
+        if self.counter in self.when_to_mock:
+            return self.mock_return[self.counter]
         else: return self.original_to_call(*args, **kwargs)
+
 
 
 class Without_Cleaning(ut.TestCase, HistData):
@@ -205,7 +205,6 @@ class With_Cleaning(ut.TestCase):
         df = df[~df["Date"].dt.date.isin(self.adjust[name]["dates"])]
         return df.set_index("Date") if changed else df
 
-
     @classmethod
     def setUpClass(cls) -> None:
         cls.adjust = {  "efx": {"start_end": (dt(2010, 3, 10), dt(2010, 3, 29)),
@@ -296,7 +295,7 @@ class With_Cleaning(ut.TestCase):
             dates = datedct["dates"]
             self.responses[sym].data = self.remove_dates_from_test_data(sym, self.responses[sym].data)
             self.hd.R.makeRequest = Mock(
-                side_effect= Custom_Mock([1], original_makeRequest, self.responses[sym]).to_call)
+                side_effect= Side_Effect({1: self.responses[sym]}, original_makeRequest))
 
             resp = self.hd.get(sym, "1m", *datedct["start_end"])
             in_ = dates.isin(resp.data.index.date)
@@ -315,32 +314,51 @@ class Break_HistData(ut.TestCase):
     the request (that took too long) still arrives. (it would increment twice)
 
     This is a test for the solution, which is the blacklisting of the id of the request
-    that times out, and not calling the add/end/received timestamp methods if a response
+    that times out, and not calling the add/end/receivedtimestamp methods if a response
     is eventually received.
     """
-    def test_price_data(self):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.today = dt.now()
+        cls.twoweeksago = cls.today - td(14)
 
-        hd = HistData(348145431343543)
-        sleep(3)
-        original_wait = Event.wait
+    def setUp(self) -> None:
+        self.hd = HistData(34814543)
+        sleep(3); print("starting test")
+    def tearDown(self) -> None: self.hd.disconnect()
 
-        Request.e.wait = Mock(side_effect= Custom_Mock([1], original_wait, False).to_call)
+    def delaydecorator(self, f, n):
+        """ this delaus the call to f by 5 seconds if the first argument to newf is equal to n"""
+        def newf(*args):
+            if args[0] == n: sleep(5)
+            return f(*args)
+        return newf
 
-        resp = hd.get("aapl", "1m", dt(2021,3,22), dt.now())
+    def test_price_blocking_directreturn(self):
+        """ (without blacklisting:) when request 1 times out, and its response is still received before the
+        second request's response, it will trigger the finalization of the Response obj too soon.
 
-        print(resp.speed, resp.errors)
-        hd.disconnect()
+        >   >    Test Setup:
+        The event in Request.Request is patched and set to return False at the first call to wait (simulating timeout),
+        then the second request is delayed (using self.delaydecorator) to ensure that the first response
+        still arrives before it. This recreates  the double increment effect, causing
+        'TypeError: unsupported operand type' in the finalizeation of the Request.Response object.
 
+        >> To recreate the error it should be sufficient to comment out the Request_Manager.BLACKLIST.append(id_)
+        line in the transmit method in Request.Request, after the call to self.EndEvent.wait"""
 
+        e = Event()
+        self.hd.reqHistoricalData = self.delaydecorator(self.hd.reqHistoricalData, 2)
+        with patch("Request.Event", new= Mock(return_value= e)): # replace inaccessible event with e
+            e.wait = Mock(side_effect= Side_Effect({1: False}, e.wait)) # set e.wait to custom side_effect
+            resp = self.hd.get("aapl", "1m", self.twoweeksago, self.today)
 
+        self.assertListEqual([1], self.hd.R.BLACKLIST, f"{self.hd.R.BLACKLIST} should be [1]")
+        self.assertListEqual(["timed out"], resp.errors, f"{resp.errors} should be ['timed out']")
+        self.assertTrue(all([isinstance(x, float) for x in resp.return_speeds()]),
+                        f"{resp.return_speeds()} should all be floats")
 
-
-
-
-
-
-
-
+        print(resp.return_speeds(), resp.errors)
 
 
 if __name__ == '__main__':
