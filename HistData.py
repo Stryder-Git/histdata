@@ -1,9 +1,9 @@
 from ibapi.wrapper import EWrapper
 from ibapi.client import EClient
 from threading import Thread
-from Cleaner.mylogging import Errors
+from mylogging import Errors
 from Request import Request_Manager
-from Cleaner.Cleaner import Cleaner
+from Cleaner import Cleaner
 
 class HistData(EWrapper, EClient):
     ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out"]

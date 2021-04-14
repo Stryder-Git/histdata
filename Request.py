@@ -82,7 +82,7 @@ class Request_Maker:
 
 
 class Request_Manager(Request_Maker):
-    from Cleaner.mylogging import Blcklist
+    from mylogging import Blcklist
     Reqs = {}
     BLACKLIST = []
     TIMEOUT = 300

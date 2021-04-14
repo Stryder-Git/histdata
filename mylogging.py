@@ -1,8 +1,8 @@
 from logging import getLogger, Formatter, FileHandler, INFO
 from datetime import datetime as dt
-FMissingDates = r"C:\Users\User\Desktop\Python\TradeCode\TWS_SPY_Data\ignore\CleanerLogs\MissingDates.log"
-FErrors = r"C:\Users\User\Desktop\Python\TradeCode\HistData\ignore\logs\Errors.log"
-FBlackList = r"C:\Users\User\Desktop\Python\TradeCode\HistData\ignore\logs\Blacklist.log"
+FMissingDates = r"ignore\logs\Cleaner_MissingDates.log"
+FErrors = r"ignore\logs\Errors.log"
+FBlackList = r"ignore\logs\Blacklist.log"
 
 time = dt.strftime(dt.now(), "%Y-%m-%d %H:%M")
 format_ = Formatter(f"%(name)s: {time}\n%(message)s")
