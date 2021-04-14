@@ -207,6 +207,13 @@ class With_Cleaning(ut.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        """
+        this sets up a dictionary of dictionaries containing the dates that are removed to test if the cleaner
+        fills them correctly.
+        The data is also requested here, to avoid having to request it in every test.
+        -> it will be kept in cls.responses
+        """
+        # dates to modify/delete
         cls.adjust = {  "efx": {"start_end": (dt(2010, 3, 10), dt(2010, 3, 29)),
                               "dates": Series([ddt(2010,3,11), ddt(2010,3,17), ddt(2010,3,18), ddt(2010,3,22)])},
 
@@ -216,6 +223,7 @@ class With_Cleaning(ut.TestCase):
                          "qtt": {"start_end": (dt(2018,10,2), dt(2018,12,28)),
                                  "dates": Series([ddt(2018,12,19), ddt(2018,12,20), ddt(2018,12,24), ddt(2018,12,26)])}
         }
+        # request the data to be cleaned
         cls.hd = HistData(141654313)
         sleep(3)
         print("\nmaking large requests")
