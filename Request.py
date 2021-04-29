@@ -160,6 +160,19 @@ class Request_Manager(Request_Maker):
     def __getitem__(self, id_): return self.Reqs[id_]
 
 
+class IBRequest:
+    """ only used to keep track of speed/errors for each request made to IB"""
+
+    def __init__(self, req):
+        self.req, self.id_ = req, req[0]
+        self.t_requested = self.speed = self.error = None
+
+    def _finalize_individual_request(self, err):
+        self.speed = time() - self.t_requested
+        self.error = err
+
+    def __iter__(self): return iter(self.req)
+    def __repr__(self): return str(self.req)
 
 class Request:
 
@@ -244,19 +257,6 @@ class Request:
         id_ = self.ixlink[self.current]
         return self.ToUnpack[id_].id_, self.ToUnpack[id_]
 
-class IBRequest:
-    """ only used to keep track of speed/errors for each request made to IB"""
-
-    def __init__(self, req):
-        self.req, self.id_ = req, req[0]
-        self.t_requested = self.speed = self.error = None
-
-    def _finalize_individual_request(self, err):
-        self.speed = time() - self.t_requested
-        self.error = err
-
-    def __iter__(self): return iter(self.req)
-    def __repr__(self): return str(self.req)
 
 class Stamp:
     def __init__(self, req, sym):
