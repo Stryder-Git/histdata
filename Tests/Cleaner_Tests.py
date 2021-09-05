@@ -2,7 +2,7 @@ import unittest as ut
 from datetime import datetime as dt, date as ddt
 from pandas import Series
 
-from Cleaner import Cleaner
+from HistData import Cleaner
 from Fetcher import Fetcher
 
 testpd = Fetcher("cleaner_test")

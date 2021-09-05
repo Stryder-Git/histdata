@@ -1,7 +1,7 @@
 import unittest as ut
 from unittest.mock import Mock, patch
-from HistData import HistData
-from Request import Response
+from HistData.HistData import HistData
+from HistData.Request import Response
 from threading import Event
 from datetime import datetime as dt, date as ddt, timedelta as td
 from time import sleep

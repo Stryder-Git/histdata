@@ -1,4 +1,4 @@
-from mylogging import MissingDates
+from .mylogging import MissingDates
 
 from numpy import append, timedelta64, split, delete, argwhere, setdiff1d, unique
 from pandas import concat, to_datetime

@@ -7,6 +7,9 @@ from pandas_market_calendars import get_calendar; nyse = get_calendar("NYSE")
 from threading import Event
 from time import time
 
+from .mylogging import Blcklist
+
+
 class Request_Maker:
     """ holds variables and methods needed to set up the requests"""
 
@@ -82,7 +85,6 @@ class Request_Maker:
 
 
 class Request_Manager(Request_Maker):
-    from mylogging import Blcklist
     Reqs = {}
     BLACKLIST = []
     TIMEOUT = 300
