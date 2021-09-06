@@ -13,8 +13,7 @@ class HistData(EWrapper, EClient):
         EClient.__init__(self, self)
         self.connect('127.0.0.1', 7497, clientid)
         Thread(target= self.run, daemon= True).start()
-        self.R = Request_Manager()
-        self.errors = Errors
+        self.R = Request_Manager(self)
         self.Block = True
         self.IBTWSConnected = False
         self.ImmediatelyCleanData = False
@@ -22,7 +21,6 @@ class HistData(EWrapper, EClient):
 
     def nextValidId(self, id_): print("connected"); self.IBTWSConnected = True
     def error(self, id_, code, string):
-        self.errors.info(f"{id_} {code} {self.R.tf_sym(id_)[1]}\n{string}")
         print(f"{id_} {code}\n{string}")
 
         if id_ == -1:
@@ -59,20 +57,16 @@ class HistData(EWrapper, EClient):
         if not response is None: self.response(response)
 
 
-    def get(self, symbol, timeframe, start, end, format_= 1, onlyRTH= False,
-            type_= "TRADES", setDateasIndex= True, transmit= None):
-        if transmit is None: transmit = self
-        if self.Block or not transmit:
-            res = self.R.makeRequest(symbol, timeframe, start, end, format_,
-                                      onlyRTH, type_,setDateasIndex, transmit)
+    def get(self, symbol, timeframe, start, end, format_= 1, onlyRTH= False, type_= "TRADES"):
+        if self.Block:
+            res = self.R.makeRequest(symbol, timeframe, start, end, format_, onlyRTH, type_)
 
             if self.ImmediatelyCleanData and self.R.isResponse(res):
                 res = self.CleanResponse(res)
             return res
         else:
             Thread(target= self.R.makeRequest,
-                   args= [symbol, timeframe, start, end, format_,
-                          onlyRTH, type_, setDateasIndex, transmit]).start()
+                   args= [symbol, timeframe, start, end, format_, onlyRTH, type_, ]).start()
 
     def getHead(self, symbol, type_= "TRADES", onlyRTH= False, format_= 1, transmit= None):
         if transmit is None: transmit = self
