@@ -4,7 +4,7 @@ from HistData.HistData import HistData, Response
 
 import datetime as dt
 
-
+HistData.DEF_CLIENTID = 8888
 
 def test_stock_price_data():
     hd = HistData()

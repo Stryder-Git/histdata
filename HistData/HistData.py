@@ -20,8 +20,9 @@ class HistData(EWrapper, EClient):
     Reqs = {}
     BLACKLIST = []
     TIMEOUT = 300
+    DEF_CLIENTID = 9999
 
-    def __init__(self, clientid= 99999):
+    def __init__(self, clientid= DEF_CLIENTID):
         EClient.__init__(self, self)
         self.connect('127.0.0.1', 7497, clientid)
         Thread(target= self.run, daemon= True).start()
