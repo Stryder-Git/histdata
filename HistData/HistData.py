@@ -91,8 +91,13 @@ class HistData(EWrapper, EClient):
         request = Stamp(symbol, type_, onlyRTH, format_)
         return self.transmit_request(request)
 
+    def _cleandate(self, d):
+        if isinstance(d, str):
+            return dt.datetime.strptime(d, "%Y-%m-%d")
+        else: return d
 
     def get(self, symbol, timeframe, start, end, format_=1, onlyRTH=False, type_="TRADES"):
+        start, end = self._cleandate(start), self._cleandate(end)
         request = Request(symbol, timeframe, start, end, format_, onlyRTH, type_)
         return self.transmit_request(request)
 

@@ -13,6 +13,10 @@ def test_stock_price_data():
     assert isinstance(aapl, Response)
     assert isinstance(aapl.data, pd.DataFrame)
 
+    fb = hd.get("FB", "30m", "2020-01-01", "2020-01-05")
+    assert isinstance(fb, Response)
+    assert isinstance(fb.data, pd.DataFrame)
+
     hd.disconnect()
 
 
