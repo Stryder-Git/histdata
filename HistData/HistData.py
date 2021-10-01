@@ -305,7 +305,7 @@ class Request:
             self.data.set_index("Date", inplace=True)
 
             # finish the response object
-            self.Response.finalize(self.data, [i for i in self])
+            self.Response.finalize(self.data, list(self))
             self.event.set()
             # make it return None when directreturn is desired
             if not self.directreturn: return self.Response
@@ -342,7 +342,7 @@ class Stamp(Request):
             err = None
 
         self[self._ids[0]]._finalize(err)
-        self.Response.finalize(stamp, self.ib_requests)
+        self.Response.finalize(stamp, list(self))
         self.event.set()
 
 

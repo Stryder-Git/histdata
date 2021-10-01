@@ -1,4 +1,6 @@
-from HistData import HistData
+import pandas as pd
+
+from HistData.HistData import HistData, Response
 
 import datetime as dt
 
@@ -8,15 +10,17 @@ def test_stock_price_data():
     hd = HistData()
 
     aapl = hd.get("AAPL", "1D", dt.datetime(2000, 1, 1), dt.datetime(2000, 1, 5))
-    print(aapl.data)
-    print(aapl.speed)
+    assert isinstance(aapl, Response)
+    assert isinstance(aapl.data, pd.DataFrame)
+
     hd.disconnect()
 
 
 def test_headtimestamp():
     hd = HistData()
     aapl_stamp = hd.getHead("AAPL")
-    print(aapl_stamp)
+    assert isinstance(aapl_stamp, Response)
+    assert isinstance(aapl_stamp.data, str)
     hd.disconnect()
 
 if __name__ == '__main__':
