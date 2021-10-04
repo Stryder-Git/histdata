@@ -28,7 +28,7 @@ class HistData(EWrapper, EClient):
         Thread(target= self.run, daemon= True).start()
         self.Block = True
         self.IBTWSConnected = False
-        self.threadwait = True
+        self._threadwait = True
         self.directreturn = True
         self.logger = logging
 
@@ -71,13 +71,13 @@ class HistData(EWrapper, EClient):
         for req in request:
             self.Reqs[req.id] = request
 
-            if self.threadwait: request.event.clear()
+            if self._threadwait: request.event.clear()
             func(*req)
-            if self.threadwait and not request.event.wait(self.TIMEOUT):
+            if self._threadwait and not request.event.wait(self.TIMEOUT):
                 self.BLACKLIST.append(req.id)
                 request.setEnd(req.id, "timed out")
 
-        if self.threadwait and self.directreturn:
+        if self._threadwait and self.directreturn:
             return request.Response
 
     def transmit_request(self, request):
@@ -100,7 +100,6 @@ class HistData(EWrapper, EClient):
         start, end = self._cleandate(start), self._cleandate(end)
         request = Request(symbol, timeframe, start, end, format_, onlyRTH, type_)
         return self.transmit_request(request)
-
 
     def ishistdatareq(self, id_): return not isinstance(self.Reqs[id_], Stamp)
 
@@ -136,7 +135,7 @@ class HistData(EWrapper, EClient):
         if not self.directreturn:
             print(response.tf, response.sym)
             print(response.df)
-            pass
+
 
     def tf_sym(self, id_):
         try: return self[id_].timeframe, self[id_].orig_sym
@@ -277,7 +276,6 @@ class Request:
                                               type_, onlyRTH, format_, False, [])
 
         self.Response = Response(self.symbol, self.orig_tf)
-        self.directreturn = True
         self.current, self.received = -1, 0
         self.event = Event()
 
@@ -313,8 +311,7 @@ class Request:
             # finish the response object
             self.Response.finalize(self.data, list(self))
             self.event.set()
-            # make it return None when directreturn is desired
-            if not self.directreturn: return self.Response
+            return self.Response
 
         else:
             self.event.set()
@@ -350,6 +347,7 @@ class Stamp(Request):
         self[self._ids[0]]._finalize(err)
         self.Response.finalize(stamp, list(self))
         self.event.set()
+        return self.Response
 
 
 class Response:
