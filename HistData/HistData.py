@@ -21,10 +21,16 @@ class HistData(EWrapper, EClient):
     BLACKLIST = []
     TIMEOUT = 300
     DEF_CLIENTID = 9999
+    DEF_PORT = 7497
+    DEF_IP = '127.0.0.1'
 
-    def __init__(self, clientid= DEF_CLIENTID):
+    def __init__(self, ip= None, clientid= None, port= None):
+        if clientid is None: clientid = self.DEF_CLIENTID
+        if port is None: port = self.DEF_PORT
+        if ip is None: ip = self.DEF_IP
+
         EClient.__init__(self, self)
-        self.connect('127.0.0.1', 7497, clientid)
+        self.connect(ip, port, clientid)
         Thread(target= self.run, daemon= True).start()
         self.Block = True
         self.IBTWSConnected = False
