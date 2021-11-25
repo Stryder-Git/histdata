@@ -9,11 +9,14 @@ import logging
 from math import ceil
 import datetime as dt
 import pandas as pd
+import pandas_market_calendars as mcal
 from itertools import count
 
 from time import time
 
-
+NYSE = mcal.get_calendar("NYSE")
+FOURDAYS = pd.Timedelta("4D")
+WEEK = pd.Timedelta("7D")
 
 class HistData(EWrapper, EClient):
     ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out"]
@@ -37,6 +40,7 @@ class HistData(EWrapper, EClient):
         self._threadwait = True
         self.directreturn = True
         self.logger = logging
+        self.today = pd.Timestamp("now").normalize()
 
     def nextValidId(self, id_): print("connected"); self.IBTWSConnected = True
     def error(self, id_, code, string):
@@ -117,6 +121,57 @@ class HistData(EWrapper, EClient):
             return True
 
         return False
+
+    def _calc_midpoint(self, left, right):
+
+        """ calcs calendar day between left and right, gets the tradingdays starting
+         7 days before and 7 days after, then takes the middle one in the list.
+         if this is the same as left, takes the next one. -> no weekends/holidays
+         Fixed_Bug: when mid falls on a holiday/weekend, it is possible that the last
+         one in the list is the same as left, that's why I added the mid+td(7) in the call
+         to self.nyse, and the conditional return"""
+        mid = left + (right - left) / 2
+        mid = NYSE.valid_days(mid- FOURDAYS, mid+ FOURDAYS).tz_localize(None)
+        midix = int(len(mid) / 2)
+        to_return = mid[midix]
+        return to_return if to_return.date() != left.date() else mid[midix + 1]
+
+    def find_first(self, sym, timeframe):
+
+        # first try to get a headtimestamp
+        left, right = self.getHead(sym), self.today
+        attempt = count(1)
+        while "timed out" in left.errors and next(attempt) < 3:
+            left = self.getHead(sym)
+
+        # if that doesn't work, set 1990 or return error
+        if not left:
+            if "No head time stamp" in left.errors:
+                left = pd.Timestamp("1990-01-01")
+            elif "invalid symbol" in left.errors:
+                return "invalid symbol"
+            elif "timed out" in left.errors:
+                return "timed out getHead"
+        else: left = pd.Timestamp(left.data)
+
+        # make the first attempt
+        found = self.get(sym, timeframe, left, left)
+        if found:  return left
+
+        # track last_test to break out if same date gets tested again, potential infinite loop
+        test = self._calc_midpoint(left, right)
+        while abs(left - right) >= WEEK:
+            found = self.get(sym, timeframe, test, test)
+
+            last_test = test
+            if found: right = test
+            else: left = test
+
+            test = self._calc_midpoint(left, right)
+            # if _calcmidpoint returns the same date, left and right must be very close anyway
+            if last_test == test: return test
+
+        return test
 
     # RECEIVERS
     def headTimestamp(self, id_, stamp):
