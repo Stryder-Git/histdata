@@ -114,7 +114,9 @@ class HistData(EWrapper, EClient):
             self.logger.info(f"{self[id_].orig_sym}: {self[id_].orig_tf} @{self[id_][id_].t_requested}\n"
                                f"request: {self[id_][id_].req}\n"
                                f"was received after {time() - self[id_][id_].t_requested}s but TIMEOUT was {self.TIMEOUT}")
+            return True
 
+        return False
 
     # RECEIVERS
     def headTimestamp(self, id_, stamp):
@@ -124,6 +126,8 @@ class HistData(EWrapper, EClient):
     def historicalData(self, id_, bar): self[id_] + bar
 
     def historicalDataEnd(self, id_, start, end):
+        if self._blacklist(id_): return
+
         response = self[id_].setEnd(id_, end if end in self.ErrResponses else None)
         self.response(response)
 
@@ -172,7 +176,11 @@ class IBRequest:
 
 
 class Request:
-    """ holds variables and methods needed to set up the requests"""
+    """ holds variables and methods needed to set up the requests
+
+    THIS CLASS IS NOT SUPPOSED TO BE USED DIRECTLY, YET.
+    Calling HistData.get should result in Response object to be created that should be used
+    """
 
     id = count(1)
     PRICECOLS = ["Date", "Open", "High", "Low", "Close", "Volume"]
@@ -333,12 +341,13 @@ class Request:
         return self[next(self.__ids)]
 
 
+# noinspection PyMissingConstructor
 class Stamp(Request):
-    def __init__(self, symbol, type_, only_rth, format):
+    def __init__(self, symbol, type_, only_rth, format_):
         self.contract, self.symbol = self.makeContract(symbol)
         id_ = next(self.id)
         self._ids = [id_]
-        self.ib_requests = {id_: IBRequest(id_, self.contract, type_, only_rth, format)}
+        self.ib_requests = {id_: IBRequest(id_, self.contract, type_, only_rth, format_)}
 
         self.event = Event()
         self.timeframe = "stamp"
@@ -384,7 +393,8 @@ class Response:
         self.errors = self.return_errors(drop_duplicates=False)
         self.nerrors = len(self.errors)
         self.speed = self.return_speeds()
-        self.speed = sum(self.speed) / len(self.speed)
+        self.full_speed = sum(self.speed)
+        self.speed = self.full_speed / len(self.speed)
 
         if isinstance(data, pd.DataFrame) and data.shape[0]:
             self.success = True
