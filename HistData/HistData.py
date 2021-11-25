@@ -223,7 +223,7 @@ class Request:
         :param end:
         :return:
         """
-        diff = ceil((end - start).total_seconds()/60/60/24)
+        diff = max(ceil((end - start).total_seconds()/60/60/24), 1)
         ndays = diff - int(diff//7 *2)
         if not ndays:
             raise ValueError("\n\n --- > no tradingdays in that range")
@@ -279,7 +279,7 @@ class Request:
             id_ = next(self.id)
             self._ids.append(id_)
             self.ib_requests[id_] = IBRequest(id_, self.contract, end, duration, self.timeframe,
-                                              type_, onlyRTH, format_, False, [])
+                                              type_, int(onlyRTH), format_, False, [])
 
         self.Response = Response(self.symbol, self.orig_tf)
         self.current, self.received = -1, 0
