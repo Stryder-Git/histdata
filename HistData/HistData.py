@@ -75,6 +75,8 @@ class HistData(EWrapper, EClient):
     @staticmethod
     def isResponse(obj): return isinstance(obj, Response)
 
+    def isError(self, err_msg): return err_msg in self.ErrResponses
+
     def _transmit_request(self, request):
         func = self.reqHistoricalData if request.timeframe != "stamp" else self.reqHeadTimeStamp
 
