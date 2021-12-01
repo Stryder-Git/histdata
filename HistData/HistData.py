@@ -240,7 +240,8 @@ class Request:
     """
 
     id = count(1)
-    PRICECOLS = ["Date", "Open", "High", "Low", "Close", "Volume"]
+    PRICECOLS = ["date", "open", "high", "low", "close", "volume"]
+    _datecol = PRICECOLS[0]
     IBDT = "%Y%m%d %H:%M:%S"
     ibtfs = dict(s="sec", m="min", h="hour", D="day", W="W", M="M")
     validibtfs = "1 secs, 5 secs, 10 secs, 15 secs, 30 secs, 1 min, 2 mins, 3 mins, 5 mins, 10 mins, 15 mins, 20 mins," \
@@ -366,8 +367,10 @@ class Request:
         if self.received == self.nreqs:
             # this makes the dataframe, sorts it, drops duplicates and trims it
             self.data = pd.DataFrame(self.data, columns=self.PRICECOLS)
-            self.data["Date"] = pd.to_datetime(self.data["Date"], infer_datetime_format=True)
-            self.data = self.data.sort_values("Date").drop_duplicates("Date")
+
+            d = self._datecol
+            self.data[d] = pd.to_datetime(self.data[d], infer_datetime_format=True)
+            self.data = self.data.sort_values(d).drop_duplicates(d)
 
             # if a date (no time) was requested, adjust the end cut off to include the whole day
             if self.end.time() == dt.time(0):
@@ -375,9 +378,9 @@ class Request:
             else:
                 end = self.end
             # trim it
-            mask = (self.start <= self.data["Date"]) & (self.data["Date"] < end)
+            mask = (self.start <= self.data[d]) & (self.data[d] < end)
             self.data = self.data[mask]
-            self.data.set_index("Date", inplace=True)
+            self.data.set_index(d, inplace=True)
 
             # finish the response object
             self.Response.finalize(self.data, list(self))
@@ -456,8 +459,8 @@ class Response:
         if isinstance(data, pd.DataFrame) and data.shape[0]:
             self.success = True
             self.shape = data.shape
-            if "Date" in data.columns:
-                self.start, self.end = data["Date"].iloc[[0, -1]]
+            if Request._datecol in data.columns:
+                self.start, self.end = data[Request._datecol].iloc[[0, -1]]
             else:
                 self.start, self.end = data.index[[0, -1]]
 
