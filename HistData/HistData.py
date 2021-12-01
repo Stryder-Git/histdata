@@ -19,7 +19,7 @@ FOURDAYS = pd.Timedelta("4D")
 WEEK = pd.Timedelta("7D")
 
 class HistData(EWrapper, EClient):
-    ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out"]
+    ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out", "timed out getHead"]
     Reqs = {}
     BLACKLIST = []
     TIMEOUT = 300
@@ -158,7 +158,7 @@ class HistData(EWrapper, EClient):
 
         # make the first attempt
         found = self.get(sym, timeframe, left, left)
-        if found:  return left
+        if found: return left
 
         # track last_test to break out if same date gets tested again, potential infinite loop
         test = self._calc_midpoint(left, right)
