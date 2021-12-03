@@ -250,9 +250,20 @@ class Request:
     ratios = dict(s=dt.timedelta(seconds=1), m=dt.timedelta(minutes=1), h=dt.timedelta(hours=1),
                   D=dt.timedelta(minutes=60 * 16), W=dt.timedelta(minutes=60 * 16 * 5), M=dt.timedelta(days=60 * 16 * 20))
 
-    @staticmethod
-    def makeContract(symbol):
+
+    _contract_defaults = {"secType": "STK", "currency": "USD", "exchange": "SMART"}
+
+    @classmethod
+    def makeContract(cls, symbol):
         if isinstance(symbol, Contract): return symbol, symbol.symbol
+
+        contract = Contract()
+
+        if isinstance(symbol, dict):
+            contract.symbol = symbol["symbol"]
+            for att, default in cls._contract_defaults.items():
+                setattr(contract, att, symbol.get(att, default))
+            return contract, contract.symbol
 
         contract = Contract()
         contract.symbol = symbol
