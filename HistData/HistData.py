@@ -232,6 +232,7 @@ class IBRequest:
     def __repr__(self): return str(self.req)
 
 
+_defcontract = Contract()
 class Request:
     """ holds variables and methods needed to set up the requests
 
@@ -251,7 +252,13 @@ class Request:
                   D=dt.timedelta(minutes=60 * 16), W=dt.timedelta(minutes=60 * 16 * 5), M=dt.timedelta(days=60 * 16 * 20))
 
 
-    _contract_defaults = {"secType": "STK", "currency": "USD", "exchange": "SMART"}
+    _contract_defaults = {k: getattr(_defcontract, k) for k in ['comboLegs', 'comboLegsDescrip', 'conId', 'currency',
+                                                                   'deltaNeutralContract', 'exchange', 'includeExpired',
+                                                                   'lastTradeDateOrContractMonth', 'localSymbol', 'multiplier',
+                                                                   'primaryExchange', 'right', 'secId', 'secIdType', 'secType',
+                                                                   'strike', 'symbol', 'tradingClass']}
+
+    _contract_defaults.update({"secType": "STK", "currency": "USD", "exchange": "SMART"})
 
     @classmethod
     def makeContract(cls, symbol):
@@ -265,7 +272,6 @@ class Request:
                 setattr(contract, att, symbol.get(att, default))
             return contract, contract.symbol
 
-        contract = Contract()
         contract.symbol = symbol
         contract.secType = "STK"
         contract.currency = "USD"
