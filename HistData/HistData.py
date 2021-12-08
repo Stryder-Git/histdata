@@ -497,14 +497,14 @@ class Response:
         self.full_speed = sum(self.speed)
         self.speed = self.full_speed / len(self.speed)
 
-        if isinstance(data, pd.DataFrame) and data.shape[0]:
-            self.success = True
-            self.shape = data.shape
-            if Request._datecol in data.columns:
-                self.start, self.end = data[Request._datecol].iloc[[0, -1]]
-            else:
-                self.start, self.end = data.index[[0, -1]]
-
+        if isinstance(data, pd.DataFrame):
+            if data.shape[0]:
+                self.success = True
+                self.shape = data.shape
+                if Request._datecol in data.columns:
+                    self.start, self.end = data[Request._datecol].iloc[[0, -1]]
+                else:
+                    self.start, self.end = data.index[[0, -1]]
         else:
             self.success = self.nerrors < self.nreqs
 
