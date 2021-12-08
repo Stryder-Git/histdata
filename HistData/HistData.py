@@ -400,7 +400,11 @@ class Request:
 
         self[id_]._finalize(err)
         self.received += 1
+        ndata = len(self.data)
+        logger.debug("RECEIVED IB-REQUEST --- id: %s nreceived: %s error: %s rows of data: %s",
+                     id_, self.received, err, ndata)
         if self.received == self.nreqs:
+            logger.info("RECEIVED REQUEST --- rows of data: %s", ndata)
             # this makes the dataframe, sorts it, drops duplicates and trims it
             self.data = pd.DataFrame(self.data, columns=self.PRICECOLS)
 
