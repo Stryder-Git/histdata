@@ -405,6 +405,7 @@ class Request:
                      id_, self.received, err, ndata)
         if self.received == self.nreqs:
             logger.info("RECEIVED REQUEST --- rows of data: %s", ndata)
+            if ndata: logger.debug("REQUEST DATA --- from %s to %s", self.data[0][0], self.data[-1][0])
             # this makes the dataframe, sorts it, drops duplicates and trims it
             self.data = pd.DataFrame(self.data, columns=self.PRICECOLS)
 
