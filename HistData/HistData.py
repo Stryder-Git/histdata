@@ -5,6 +5,7 @@ from ibapi.contract import Contract
 
 from threading import Thread, Event
 import logging
+logger = logging.getLogger(__name__)
 
 from math import ceil
 import datetime as dt
@@ -19,7 +20,8 @@ FOURDAYS = pd.Timedelta("4D")
 WEEK = pd.Timedelta("7D")
 
 class HistData(EWrapper, EClient):
-    ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out", "timed out getHead"]
+    logger = logger
+    ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out"]
     Reqs = {}
     BLACKLIST = []
     TIMEOUT = 300
@@ -42,32 +44,48 @@ class HistData(EWrapper, EClient):
         self.logger = logging
         self.today = pd.Timestamp("now").normalize()
 
-    def nextValidId(self, id_): print("connected"); self.IBTWSConnected = True
-    def error(self, id_, code, string):
-        print(f"{id_} {code}\n{string}")
+    def nextValidId(self, id_):
+        self.logger.info("connected nextValidId: %s", id_)
+        self.IBTWSConnected = True
 
+    def _log_error(self, level, id_, code, string, prefix= ""):
+        self.logger.log(level, "%s%s: %s - %s", prefix, id_, code, string)
+
+    def error(self, id_, code, string):
         if id_ == -1:
             if "Connectivity between IB and Trader Workstation has been lost" in string:
+                self._log_error(logging.CRITICAL, id_, code, string, prefix= "INTERNET DOWN --- ")
                 self.IBTWSConnected = False
             elif "Connectivity between IB and Trader Workstation has been restored" in string:
+                self._log_error(logging.CRITICAL, id_, code, string, prefix= "INTERNET BACK --- ")
                 self.IBTWSConnected = True
+            else:
+                self._log_error(logging.DEBUG, id_, code, string, prefix= "UNCAUGHT --- ")
 
         if "query returned no data" in string:
+            self._log_error(logging.DEBUG, id_, code, string)
             self.historicalDataEnd(id_, code, "No Data")
 
         elif "No head time stamp" in string:
+            self._log_error(logging.DEBUG, id_, code, string)
             self.headTimestamp(id_, "No head time stamp")
 
         elif "No security definition" in string or "is ambiguous" in string:
+            self._log_error(logging.WARNING, id_, code, string)
             if not self.IBTWSConnected: return
             if self.ishistdatareq(id_): self.historicalDataEnd(id_, code, "invalid symbol")
             else: self.headTimestamp(id_, "invalid symbol")
 
         elif "Request Timed Out" in string:
+            self._log_error(logging.WARNING, id_, code, string)
             if self.ishistdatareq(id_): self.historicalDataEnd(id_, code, "timed out")
             else: self.headTimestamp(id_, "timed out")
 
-        elif "Couldn't connect to TWS" in string or "Not connected" in string: exit()
+        elif "Couldn't connect to TWS" in string or "Not connected" in string:
+            self._log_error(logging.ERROR, id_, code, string)
+            exit()
+        else:
+            self._log_error(logging.DEBUG, id_, code, string, prefix="UNCAUGHT --- ")
 
     @classmethod
     def setTimeOut(cls, seconds): cls.TIMEOUT = seconds
@@ -84,8 +102,10 @@ class HistData(EWrapper, EClient):
             self.Reqs[req.id] = request
 
             if self._threadwait: request.event.clear()
+            self.logger.debug("SENDING REQUEST --- %s", req)
             func(*req)
             if self._threadwait and not request.event.wait(self.TIMEOUT):
+                self.logger.info("EVENT TIMEOUT --- request id: %s", req.id)
                 self.BLACKLIST.append(req.id)
                 request.setEnd(req.id, "timed out")
 
@@ -158,7 +178,7 @@ class HistData(EWrapper, EClient):
 
         # make the first attempt
         found = self.get(sym, timeframe, left, left)
-        if found: return left
+        if found:  return left
 
         # track last_test to break out if same date gets tested again, potential infinite loop
         test = self._calc_midpoint(left, right)
