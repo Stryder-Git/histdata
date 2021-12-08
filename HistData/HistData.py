@@ -41,7 +41,6 @@ class HistData(EWrapper, EClient):
         self.IBTWSConnected = False
         self._threadwait = True
         self.directreturn = True
-        self.logger = logging
         self.today = pd.Timestamp("now").normalize()
 
     def nextValidId(self, id_):
