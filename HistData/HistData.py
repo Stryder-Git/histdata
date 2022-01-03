@@ -136,7 +136,7 @@ class HistData(EWrapper, EClient):
 
     def _blacklist(self, id_):
         if id_ in self.BLACKLIST:
-            self.logger.info(f"{self[id_].orig_sym}: {self[id_].orig_tf} @{self[id_][id_].t_requested}\n"
+            self.logger.info(f"{self[id_].symbol}: {self[id_].orig_tf} @{self[id_][id_].t_requested}\n"
                                f"request: {self[id_][id_].req}\n"
                                f"was received after {time() - self[id_][id_].t_requested}s but TIMEOUT was {self.TIMEOUT}")
             return True
