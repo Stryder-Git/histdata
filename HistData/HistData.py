@@ -95,7 +95,8 @@ class HistData(EWrapper, EClient):
     def isError(self, err_msg): return err_msg in self.ErrResponses
 
     def _transmit_request(self, request):
-        func = self.reqHistoricalData if request.timeframe != "stamp" else self.reqHeadTimeStamp
+        isStamp = isinstance(request, Stamp)
+        func = self.reqHeadTimeStamp if isStamp else self.reqHistoricalData
 
         for req in request:
             self.Reqs[req.id] = request
@@ -106,10 +107,8 @@ class HistData(EWrapper, EClient):
             if self._threadwait and not request.event.wait(self.TIMEOUT):
                 self.logger.info("EVENT TIMEOUT --- request id: %s", req.id)
                 self.BLACKLIST.append(req.id)
-                if isinstance(request, Stamp):
-                    request.setEnd("timed_out")
-                else:
-                    request.setEnd(req.id, "timed out")
+                if isStamp: request.setEnd("timed_out")
+                else: request.setEnd(req.id, "timed out")
 
         if self._threadwait and self.directreturn:
             return request.Response
