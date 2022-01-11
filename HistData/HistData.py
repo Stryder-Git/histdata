@@ -489,6 +489,7 @@ class Response:
         if a dataframe was returned, it's considered a success
         if not then its only a success if there are less errors than
         requests"""
+        logger.info("finalizing response with: %s", data)
         self.data = data
         self.requests = reqs
         self.nreqs = len(reqs)
