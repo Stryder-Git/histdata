@@ -106,7 +106,10 @@ class HistData(EWrapper, EClient):
             if self._threadwait and not request.event.wait(self.TIMEOUT):
                 self.logger.info("EVENT TIMEOUT --- request id: %s", req.id)
                 self.BLACKLIST.append(req.id)
-                request.setEnd(req.id, "timed out")
+                if isinstance(request, Stamp):
+                    request.setEnd("timed_out")
+                else:
+                    request.setEnd(req.id, "timed out")
 
         if self._threadwait and self.directreturn:
             return request.Response
