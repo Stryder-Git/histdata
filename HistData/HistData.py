@@ -174,7 +174,7 @@ class HistData(EWrapper, EClient):
             elif "invalid symbol" in left.errors:
                 return "invalid symbol"
             elif "timed out" in left.errors:
-                return "timed out getHead"
+                return "timed out"
         else: left = pd.Timestamp(left.data)
 
         # make the first attempt
