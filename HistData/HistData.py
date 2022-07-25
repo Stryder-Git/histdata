@@ -24,7 +24,7 @@ class HistData(EWrapper, EClient):
     ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out"]
     Reqs = {}
     BLACKLIST = []
-    TIMEOUT = 300
+    TIMEOUT = 30
     DEF_CLIENTID = 9999
     DEF_PORT = 7497
     DEF_IP = '127.0.0.1'
@@ -117,7 +117,7 @@ class HistData(EWrapper, EClient):
         if self.Block:
             return self._transmit_request(request)
         else:
-            Thread(target=self._transmit_request, args=request).start()
+            Thread(target=self._transmit_request, args=(request,)).start()
 
     def getHead(self, symbol, type_= "TRADES", onlyRTH= False, format_= 1):
         # set the Stamp with: request args, symbol, and Event to be waited for
