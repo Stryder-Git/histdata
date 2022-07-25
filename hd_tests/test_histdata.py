@@ -5,8 +5,8 @@ from HistData.HistData import HistData, Response
 import datetime as dt
 
 HistData.DEF_CLIENTID = 8888
-
-def test_stock_price_data():
+HistData.setTimeOut(30)
+def test_get():
     hd = HistData()
 
     aapl = hd.get("AAPL", "1D", dt.datetime(2000, 1, 1), dt.datetime(2000, 1, 5))
@@ -20,12 +20,16 @@ def test_stock_price_data():
     hd.disconnect()
 
 
-def test_headtimestamp():
+def test_getHead():
     hd = HistData()
     aapl_stamp = hd.getHead("AAPL")
     assert isinstance(aapl_stamp, Response)
     assert isinstance(aapl_stamp.data, str)
     hd.disconnect()
+
+
+def test_find_first():
+    return
 
 if __name__ == '__main__':
 

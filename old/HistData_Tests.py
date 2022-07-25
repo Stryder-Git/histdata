@@ -1,7 +1,7 @@
 import unittest as ut
 from unittest.mock import Mock, patch
 from HistData.HistData import HistData
-from HistData.Request import Response
+from HistData.HistData import Response
 from threading import Event
 from datetime import datetime as dt, date as ddt, timedelta as td
 from time import sleep
@@ -191,130 +191,130 @@ class Without_Cleaning(ut.TestCase, HistData):
                         f"result is not what it's supposed to be in {test}")
             self.assertIsInstance(direct.speed, float, f"speed is not a float in {test}")
 
-
-class With_Cleaning(ut.TestCase):
-    """ Here, mainly the use of the CleanResponse method in HistData is tested:
-    The manual use, after receiving the uncleaned response when ImmediatelyClean is set to False
-    and the automatic use when ImmediatelyClean is set to True """
-    def remove_dates_from_test_data(self, name, df):
-        changed= False
-        if not "Date" in df.columns:
-            changed= True
-            df.reset_index(inplace= True)
-
-        df = df[~df["Date"].dt.date.isin(self.adjust[name]["dates"])]
-        return df.set_index("Date") if changed else df
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        """
-        this sets up a dictionary of dictionaries containing the dates that are removed to test if the cleaner
-        fills them correctly.
-        The data is also requested here, to avoid having to request it in every test.
-        -> it will be kept in cls.responses
-        """
-        # dates to modify/delete
-        cls.adjust = {  "efx": {"start_end": (dt(2010, 3, 10), dt(2010, 3, 29)),
-                              "dates": Series([ddt(2010,3,11), ddt(2010,3,17), ddt(2010,3,18), ddt(2010,3,22)])},
-
-                         "acic": {"start_end": (dt(2021, 1, 20), dt(2021, 2, 12)),
-                                 "dates": Series([ddt(2021,1,22), ddt(2021,1,27), ddt(2021,1,28), ddt(2021,2,10)])},
-
-                         "qtt": {"start_end": (dt(2018,10,2), dt(2018,12,28)),
-                                 "dates": Series([ddt(2018,12,19), ddt(2018,12,20), ddt(2018,12,24), ddt(2018,12,26)])}
-        }
-        # request the data to be cleaned
-        cls.hd = HistData(141654313)
-        sleep(3)
-        print("\nmaking large requests")
-        cls.responses = {sym: cls.hd.get(sym, "1m", *datedct["start_end"]) for sym, datedct in cls.adjust.items()}
-
-    def test_CleanResponse(self):
-        """ this will test the CleanResponse as a seperate method"""
-        self.hd.Blocking(True)
-        self.hd.setImmediatelyCleanTo(False)
-
-        for sym, datedct in self.adjust.items():
-            print("doing ", sym)
-            dates = datedct["dates"]
-            resp = self.responses[sym]
-            # get the data and remove the dates
-            resp.data = self.remove_dates_from_test_data(sym, resp.data)
-            print("got and removed")
-
-            # check if dates are correctly removed
-            in_ = dates.isin(resp.data.index.date)
-            self.assertFalse(in_.any(), f"{sym}: dates were incorrectly removed {dates[in_]}")
-
-            # run it through the cleaner and check if all dates have been added correctly
-            resp = self.hd.CleanResponse(resp)
-            in_ = dates.isin(resp.data.index.date)
-            self.assertTrue(in_.all(), f"{sym}: dates weren't added: {dates[~in_]}")
-
-            # check if cache of cleaner is empty
-            self.assertEqual(len(self.hd.Cleaner.dates_counts), 0, f"{sym}: dates_counts cache wasn't cleared")
-            self.assertEqual(len(self.hd.Cleaner.datatoconcat), 0, f"{sym}: datatoconcat cache wasn't cleared")
-
-
-    def test_Cleaner_methods_as_mocks(self):
-        """here the Cleaner module is replaced with a Mock object to verify the automatic
-         calling of the methods in the get method"""
-        self.hd.Blocking(True)
-        self.hd.setImmediatelyCleanTo(True)
-        original_makeRequest = self.hd.R.makeRequest
-        original_Cleaner = self.hd.Cleaner
-
-        # This will mock the makeRequest method of the Request_Manager, setting the return
-        # value to look like the response object
-        mock_response = Response("sym", "tf"); mock_response.data = "data"
-        self.hd.R.makeRequest = Mock(return_value= mock_response)
-
-        prepare_return = self.hd.Cleaner.Form("sym", "data")
-        for sym, datedct in self.adjust.items():
-            d = datedct["start_end"][1]
-            self.hd.Cleaner = Mock()
-            # The Prepare and FillMissingData methods will be mock objects returning the
-            # prepare_return object which looks like the namedtuple in the Cleaner
-            self.hd.Cleaner.Prepare.return_value = prepare_return
-            self.hd.Cleaner.FillMissingData.return_value = prepare_return
-
-            resp = self.hd.get(sym, "1m", d, d)
-            self.hd.Cleaner.Prepare.assert_called_once_with(mock_response.sym, mock_response.data)
-            # print(self.hd.Cleaner.Prepare.call_args_list)
-            self.hd.Cleaner.FillMissingData.assert_called_once_with(prepare_return)
-            # print(self.hd.Cleaner.FillMissingData.call_args_list)
-            self.hd.Cleaner.clear_cache.assert_called_once_with(prepare_return)
-            # print(self.hd.Cleaner.clear_cache.call_args_list)
-
-            self.assertEqual(resp.data, prepare_return.df)
-
-        self.hd.R.makeRequest = original_makeRequest
-        self.hd.Cleaner = original_Cleaner
-
-
-    def test_Cleaner_with_mock_data(self):
-        """ This test replaces the MakeRequest response data with the data where some dates are removed to run it
-        through the automatically called Cleaner methods"""
-        self.hd.Blocking(True)
-        self.hd.setImmediatelyCleanTo(True)
-        original_makeRequest = self.hd.R.makeRequest
-
-        for sym, datedct in self.adjust.items():
-            dates = datedct["dates"]
-            self.responses[sym].data = self.remove_dates_from_test_data(sym, self.responses[sym].data)
-            self.hd.R.makeRequest = Mock(
-                side_effect= Side_Effect({1: self.responses[sym]}, original_makeRequest))
-
-            resp = self.hd.get(sym, "1m", *datedct["start_end"])
-            in_ = dates.isin(resp.data.index.date)
-            self.assertTrue(in_.all(), f"{sym}: dates weren't added: {dates[~in_]}")
-
-            # check if cache of cleaner is empty
-            self.assertEqual(len(self.hd.Cleaner.dates_counts), 0, f"{sym}: dates_counts cache wasn't cleared")
-            self.assertEqual(len(self.hd.Cleaner.datatoconcat), 0, f"{sym}: datatoconcat cache wasn't cleared")
-
-        self.hd.R.makeRequest = original_makeRequest
-
+#
+# class With_Cleaning(ut.TestCase):
+#     """ Here, mainly the use of the CleanResponse method in HistData is tested:
+#     The manual use, after receiving the uncleaned response when ImmediatelyClean is set to False
+#     and the automatic use when ImmediatelyClean is set to True """
+#     def remove_dates_from_test_data(self, name, df):
+#         changed= False
+#         if not "Date" in df.columns:
+#             changed= True
+#             df.reset_index(inplace= True)
+#
+#         df = df[~df["Date"].dt.date.isin(self.adjust[name]["dates"])]
+#         return df.set_index("Date") if changed else df
+#
+#     @classmethod
+#     def setUpClass(cls) -> None:
+#         """
+#         this sets up a dictionary of dictionaries containing the dates that are removed to test if the cleaner
+#         fills them correctly.
+#         The data is also requested here, to avoid having to request it in every test.
+#         -> it will be kept in cls.responses
+#         """
+#         # dates to modify/delete
+#         cls.adjust = {  "efx": {"start_end": (dt(2010, 3, 10), dt(2010, 3, 29)),
+#                               "dates": Series([ddt(2010,3,11), ddt(2010,3,17), ddt(2010,3,18), ddt(2010,3,22)])},
+#
+#                          "acic": {"start_end": (dt(2021, 1, 20), dt(2021, 2, 12)),
+#                                  "dates": Series([ddt(2021,1,22), ddt(2021,1,27), ddt(2021,1,28), ddt(2021,2,10)])},
+#
+#                          "qtt": {"start_end": (dt(2018,10,2), dt(2018,12,28)),
+#                                  "dates": Series([ddt(2018,12,19), ddt(2018,12,20), ddt(2018,12,24), ddt(2018,12,26)])}
+#         }
+#         # request the data to be cleaned
+#         cls.hd = HistData(141654313)
+#         sleep(3)
+#         print("\nmaking large requests")
+#         cls.responses = {sym: cls.hd.get(sym, "1m", *datedct["start_end"]) for sym, datedct in cls.adjust.items()}
+#
+#     def test_CleanResponse(self):
+#         """ this will test the CleanResponse as a seperate method"""
+#         self.hd.Blocking(True)
+#         self.hd.setImmediatelyCleanTo(False)
+#
+#         for sym, datedct in self.adjust.items():
+#             print("doing ", sym)
+#             dates = datedct["dates"]
+#             resp = self.responses[sym]
+#             # get the data and remove the dates
+#             resp.data = self.remove_dates_from_test_data(sym, resp.data)
+#             print("got and removed")
+#
+#             # check if dates are correctly removed
+#             in_ = dates.isin(resp.data.index.date)
+#             self.assertFalse(in_.any(), f"{sym}: dates were incorrectly removed {dates[in_]}")
+#
+#             # run it through the cleaner and check if all dates have been added correctly
+#             resp = self.hd.CleanResponse(resp)
+#             in_ = dates.isin(resp.data.index.date)
+#             self.assertTrue(in_.all(), f"{sym}: dates weren't added: {dates[~in_]}")
+#
+#             # check if cache of cleaner is empty
+#             self.assertEqual(len(self.hd.Cleaner.dates_counts), 0, f"{sym}: dates_counts cache wasn't cleared")
+#             self.assertEqual(len(self.hd.Cleaner.datatoconcat), 0, f"{sym}: datatoconcat cache wasn't cleared")
+#
+#
+#     def test_Cleaner_methods_as_mocks(self):
+#         """here the Cleaner module is replaced with a Mock object to verify the automatic
+#          calling of the methods in the get method"""
+#         self.hd.Blocking(True)
+#         self.hd.setImmediatelyCleanTo(True)
+#         original_makeRequest = self.hd.R.makeRequest
+#         original_Cleaner = self.hd.Cleaner
+#
+#         # This will mock the makeRequest method of the Request_Manager, setting the return
+#         # value to look like the response object
+#         mock_response = Response("sym", "tf"); mock_response.data = "data"
+#         self.hd.R.makeRequest = Mock(return_value= mock_response)
+#
+#         prepare_return = self.hd.Cleaner.Form("sym", "data")
+#         for sym, datedct in self.adjust.items():
+#             d = datedct["start_end"][1]
+#             self.hd.Cleaner = Mock()
+#             # The Prepare and FillMissingData methods will be mock objects returning the
+#             # prepare_return object which looks like the namedtuple in the Cleaner
+#             self.hd.Cleaner.Prepare.return_value = prepare_return
+#             self.hd.Cleaner.FillMissingData.return_value = prepare_return
+#
+#             resp = self.hd.get(sym, "1m", d, d)
+#             self.hd.Cleaner.Prepare.assert_called_once_with(mock_response.sym, mock_response.data)
+#             # print(self.hd.Cleaner.Prepare.call_args_list)
+#             self.hd.Cleaner.FillMissingData.assert_called_once_with(prepare_return)
+#             # print(self.hd.Cleaner.FillMissingData.call_args_list)
+#             self.hd.Cleaner.clear_cache.assert_called_once_with(prepare_return)
+#             # print(self.hd.Cleaner.clear_cache.call_args_list)
+#
+#             self.assertEqual(resp.data, prepare_return.df)
+#
+#         self.hd.R.makeRequest = original_makeRequest
+#         self.hd.Cleaner = original_Cleaner
+#
+#
+#     def test_Cleaner_with_mock_data(self):
+#         """ This test replaces the MakeRequest response data with the data where some dates are removed to run it
+#         through the automatically called Cleaner methods"""
+#         self.hd.Blocking(True)
+#         self.hd.setImmediatelyCleanTo(True)
+#         original_makeRequest = self.hd.R.makeRequest
+#
+#         for sym, datedct in self.adjust.items():
+#             dates = datedct["dates"]
+#             self.responses[sym].data = self.remove_dates_from_test_data(sym, self.responses[sym].data)
+#             self.hd.R.makeRequest = Mock(
+#                 side_effect= Side_Effect({1: self.responses[sym]}, original_makeRequest))
+#
+#             resp = self.hd.get(sym, "1m", *datedct["start_end"])
+#             in_ = dates.isin(resp.data.index.date)
+#             self.assertTrue(in_.all(), f"{sym}: dates weren't added: {dates[~in_]}")
+#
+#             # check if cache of cleaner is empty
+#             self.assertEqual(len(self.hd.Cleaner.dates_counts), 0, f"{sym}: dates_counts cache wasn't cleared")
+#             self.assertEqual(len(self.hd.Cleaner.datatoconcat), 0, f"{sym}: datatoconcat cache wasn't cleared")
+#
+#         self.hd.R.makeRequest = original_makeRequest
+#
 
 class Break_HistData(ut.TestCase):
     """When threadingEvent times out, the received counter increments.
