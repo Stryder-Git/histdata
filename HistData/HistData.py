@@ -82,7 +82,6 @@ class HistData(EWrapper, EClient):
 
         elif "Couldn't connect to TWS" in string or "Not connected" in string:
             self._log_error(logging.ERROR, id_, code, string)
-            exit()
         else:
             self._log_error(logging.DEBUG, id_, code, string, prefix="UNCAUGHT --- ")
 

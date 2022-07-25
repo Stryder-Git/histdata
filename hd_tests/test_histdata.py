@@ -1,33 +1,50 @@
 import pandas as pd
 import pytest
+from datetime import datetime as dt
+
 from HistData.HistData import HistData, Response
 
-from datetime import datetime as dt
+# import logging
+# import sys
+#
+# logger = logging.getLogger("HistData.HistData")
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setLevel(1)
+# logger.addHandler(handler)
+# logger.setLevel(1)
+
+
 
 @pytest.fixture(scope= "module")
 def histdata():
     HistData.DEF_CLIENTID = 8888
     HistData.setTimeOut(30)
     hd = HistData()
-    print("\nconnected: ", hd.isConnected(), "\n")
     yield hd
     hd.disconnect()
-    print("\nconnected: ", hd.isConnected(), "\n")
 
 @pytest.fixture
-def hd_block_direct(histdata):
-    histdata.Blocking(True)
+def check_connect(histdata):
+    if not histdata.isConnected():
+        pytest.skip("Could not connect to TWS", allow_module_level= True)
     return histdata
 
 @pytest.fixture
-def hd_block_notdirect(histdata):
-    histdata.Blocking(False)
-    return histdata
+def hd_block_direct(check_connect):
+    check_connect.Blocking(True)
+    return check_connect
 
 @pytest.fixture
-def hd_notblock(histdata):
-    histdata.NotBlocking()
-    return histdata
+def hd_block_notdirect(check_connect):
+    check_connect.Blocking(False)
+    return check_connect
+
+@pytest.fixture
+def hd_notblock(check_connect):
+    check_connect.NotBlocking()
+    return check_connect
+
+
 
 def test_blocking_direct(hd_block_direct):
     assert hd_block_direct.Block and hd_block_direct.directreturn
@@ -37,6 +54,8 @@ def test_blocking_notdirect(hd_block_notdirect):
 
 def test_notblocking(hd_notblock):
     assert not hd_notblock.Block and not hd_notblock.directreturn
+
+
 
 @pytest.mark.parametrize("req, result", [
     (("aapl", "1h", dt(2010,1,1), dt(2010,3,5)),
