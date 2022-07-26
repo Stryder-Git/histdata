@@ -18,34 +18,35 @@ from HistData.HistData import HistData, Response
 @pytest.fixture(scope= "module")
 def histdata():
     HistData.DEF_CLIENTID = 8887
-    HistData.setTimeOut(15)
+    HistData.setTimeOut(10)
     hd = HistData()
+    if not hd.isConnected():
+        pytest.skip("Not connected to TWS\n", allow_module_level= True)
     yield hd
     hd.disconnect()
 
 @pytest.fixture
-def check_connect(histdata):
-    if not histdata.isConnected():
-        pytest.skip("Could not connect to TWS\n"
-                    "Either TWS is not running or you are running the tests too often\n"
-                    "since IB throttles requests.", allow_module_level= True)
+def hd_block(histdata):
+    histdata.block()
     return histdata
 
 @pytest.fixture
-def hd_block(check_connect):
-    check_connect.block()
-    return check_connect
-
-@pytest.fixture
-def hd_notblock(check_connect):
-    check_connect.block(False)
-    return check_connect
+def hd_notblock(histdata):
+    histdata.block(False)
+    return histdata
 
 def test_blocking(hd_block):
     assert hd_block.blocks
 
 def test_notblocking(hd_notblock):
     assert not hd_notblock.blocks
+
+
+def _get_check(func, *args, **kwargs):
+    res = func(*args, **kwargs)
+    if not func.__self__.isConnected():
+        pytest.xfail("Lost connection to TWS\n")
+    return res
 
 
 R = namedtuple("R", ["shape", "start", "end", "errors"])
@@ -56,20 +57,18 @@ R = namedtuple("R", ["shape", "start", "end", "errors"])
     (("amzn", "30m", dt(2006, 10, 11, 12, 40), dt(2006, 10, 17, 14, 15)),
      R((100,5), dt(2006,10,11,13), dt(2006,10,17,14), [])),
     (("fb", "1m", dt(2005,4,1,15,23), dt(2005,4,12,11,15)),
-     R(None, None, None, ["No Data", "No Data"])),
+     R(None, None, None, ["invalid symbol", "invalid symbol"])),
 ])
-
 def test_get_blocking(req, result, hd_block):
-    resp = hd_block.get(*req)
+    resp = _get_check(hd_block.get, *req)
 
     assert isinstance(resp, Response)
     assert isinstance(resp.data, pd.DataFrame)
 
     assert resp.shape == result.shape
-    assert resp.start == pd.Timestamp(result.start)
-    assert resp.end == pd.Timestamp(result.end)
+    assert resp.start == (None if result.start is None else pd.Timestamp(result.start))
+    assert resp.end == (None if result.end is None else pd.Timestamp(result.end))
     assert resp.errors == result.errors
-
 
 
 # def test_getHead(hd):

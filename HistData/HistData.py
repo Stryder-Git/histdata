@@ -53,15 +53,12 @@ class HistData(EWrapper, EClient):
         self._threadwait = True
         self.today = pd.Timestamp("now").normalize()
 
-    @property
-    def blocks(self): return self._block
-
+    ###########################
+    # ibapi receiving methods #
+    ###########################
     def nextValidId(self, id_):
         self.logger.info("connected nextValidId: %s", id_)
         self.IBTWSConnected = True
-
-    def _log_error(self, level, id_, code, string, prefix= ""):
-        self.logger.log(level, "%s%s: %s - %s", prefix, id_, code, string)
 
     def error(self, id_, code, string):
         if id_ == -1:
@@ -97,6 +94,25 @@ class HistData(EWrapper, EClient):
             self._log_error(logging.ERROR, id_, code, string)
         else:
             self._log_error(logging.DEBUG, id_, code, string, prefix="UNCAUGHT --- ")
+
+    def headTimestamp(self, id_, stamp):
+        response = self[id_].setEnd(stamp)
+        self.response(response)
+
+    def historicalData(self, id_, bar): self[id_] + bar
+
+    def historicalDataEnd(self, id_, start, end):
+        if self._blacklist(id_): return
+
+        response = self[id_].setEnd(id_, end if end in self.ErrResponses else None)
+        self.response(response)
+
+
+    @property
+    def blocks(self): return self._block
+
+    def _log_error(self, level, id_, code, string, prefix= ""):
+        self.logger.log(level, "%s%s: %s - %s", prefix, id_, code, string)
 
     @classmethod
     def setTimeOut(cls, seconds): cls.TIMEOUT = seconds
@@ -206,19 +222,6 @@ class HistData(EWrapper, EClient):
             if last_test == test: return test
 
         return test
-
-    # RECEIVERS
-    def headTimestamp(self, id_, stamp):
-        response = self[id_].setEnd(stamp)
-        self.response(response)
-
-    def historicalData(self, id_, bar): self[id_] + bar
-
-    def historicalDataEnd(self, id_, start, end):
-        if self._blacklist(id_): return
-
-        response = self[id_].setEnd(id_, end if end in self.ErrResponses else None)
-        self.response(response)
 
     def block(self, bool_= True):
         self._block = bool_
