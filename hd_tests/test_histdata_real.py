@@ -18,7 +18,7 @@ from HistData.HistData import HistData, Response
 @pytest.fixture(scope= "module")
 def histdata():
     HistData.DEF_CLIENTID = 8887
-    HistData.setTimeOut(30)
+    HistData.setTimeOut(15)
     hd = HistData()
     yield hd
     hd.disconnect()
@@ -32,30 +32,20 @@ def check_connect(histdata):
     return histdata
 
 @pytest.fixture
-def hd_block_direct(check_connect):
-    check_connect.Blocking(True)
-    return check_connect
-
-@pytest.fixture
-def hd_block_notdirect(check_connect):
-    check_connect.Blocking(False)
+def hd_block(check_connect):
+    check_connect.block()
     return check_connect
 
 @pytest.fixture
 def hd_notblock(check_connect):
-    check_connect.NotBlocking()
+    check_connect.block(False)
     return check_connect
 
-
-
-def test_blocking_direct(hd_block_direct):
-    assert hd_block_direct.Block and hd_block_direct.directreturn
-
-def test_blocking_notdirect(hd_block_notdirect):
-    assert hd_block_notdirect.Block and not hd_block_notdirect.directreturn
+def test_blocking(hd_block):
+    assert hd_block.blocks
 
 def test_notblocking(hd_notblock):
-    assert not hd_notblock.Block and not hd_notblock.directreturn
+    assert not hd_notblock.blocks
 
 
 R = namedtuple("R", ["shape", "start", "end", "errors"])
@@ -69,8 +59,8 @@ R = namedtuple("R", ["shape", "start", "end", "errors"])
      R(None, None, None, ["No Data", "No Data"])),
 ])
 
-def test_get_blocking_direct_success(req, result, hd_block_direct):
-    resp = hd_block_direct.get(*req)
+def test_get_blocking(req, result, hd_block):
+    resp = hd_block.get(*req)
 
     assert isinstance(resp, Response)
     assert isinstance(resp.data, pd.DataFrame)

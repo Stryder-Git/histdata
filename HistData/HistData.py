@@ -12,12 +12,23 @@ import datetime as dt
 import pandas as pd
 import pandas_market_calendars as mcal
 from itertools import count
-
+from functools import wraps
 from time import time
 
 NYSE = mcal.get_calendar("NYSE")
 FOURDAYS = pd.Timedelta("4D")
 WEEK = pd.Timedelta("7D")
+
+def _temp_block(meth):
+    @wraps(meth)
+    def _meth(self, *args, **kwargs):
+        prev = self._block
+        self.block(True)
+        result = meth(self, *args, **kwargs)
+        self.block(prev)
+        return result
+
+    return _meth
 
 class HistData(EWrapper, EClient):
     logger = logger
@@ -37,11 +48,13 @@ class HistData(EWrapper, EClient):
         EClient.__init__(self, self)
         self.connect(ip, port, clientid)
         Thread(target= self.run, daemon= True).start()
-        self.Block = True
+        self._block = True
         self.IBTWSConnected = False
         self._threadwait = True
-        self.directreturn = True
         self.today = pd.Timestamp("now").normalize()
+
+    @property
+    def blocks(self): return self._block
 
     def nextValidId(self, id_):
         self.logger.info("connected nextValidId: %s", id_)
@@ -109,14 +122,13 @@ class HistData(EWrapper, EClient):
                 if isStamp: request.setEnd("timed out")
                 else: request.setEnd(req.id, "timed out")
 
-        if self._threadwait and self.directreturn:
-            return request.Response
-
     def transmit_request(self, request):
-        if self.Block:
-            return self._transmit_request(request)
+        if self._block:
+            self._transmit_request(request)
         else:
             Thread(target=self._transmit_request, args=(request,)).start()
+
+        return request.response
 
     def getHead(self, symbol, type_= "TRADES", onlyRTH= False, format_= 1):
         # set the Stamp with: request args, symbol, and Event to be waited for
@@ -158,8 +170,8 @@ class HistData(EWrapper, EClient):
         to_return = mid[midix]
         return to_return if to_return.date() != left.date() else mid[midix + 1]
 
+    @_temp_block
     def find_first(self, sym, timeframe):
-
         # first try to get a headtimestamp
         left, right = self.getHead(sym), self.today
         attempt = count(1)
@@ -208,21 +220,12 @@ class HistData(EWrapper, EClient):
         response = self[id_].setEnd(id_, end if end in self.ErrResponses else None)
         self.response(response)
 
-    ## FOR USER
-    def NotBlocking(self):
-        self.Block = False
-        self.directreturn = False
-
-    def Blocking(self, directreturn= True):
-        self.Block = True
-        self.directreturn = directreturn
+    def block(self, bool_= True):
+        self._block = bool_
 
     def response(self, response):
         """ overwrite in child class """
-        if not self.directreturn:
-            print(response.tf, response.sym)
-            print(response.df)
-
+        return response
 
     def tf_sym(self, id_):
         try: return self[id_].timeframe, self[id_].orig_sym
@@ -384,7 +387,7 @@ class Request:
             self.ib_requests[id_] = IBRequest(id_, self.contract, end, duration, self.timeframe,
                                               type_, int(onlyRTH), format_, False, [])
 
-        self.Response = Response(self.symbol, self.orig_tf)
+        self.response = Response(self.symbol, self.orig_tf)
         self.current, self.received = -1, 0
         self.event = Event()
 
@@ -425,9 +428,9 @@ class Request:
             self.data.set_index(d, inplace=True)
 
             # finish the response object
-            self.Response.finalize(self.data, list(self))
+            self.response.finalize(self.data, list(self))
             self.event.set()
-            return self.Response
+            return self.response
 
         else:
             self.event.set()
@@ -453,7 +456,7 @@ class Stamp(Request):
 
         self.event = Event()
         self.timeframe = "stamp"
-        self.Response = Response(self.symbol, self.timeframe)
+        self.response = Response(self.symbol, self.timeframe)
 
     def setEnd(self, stamp):
         if stamp in HistData.ErrResponses:
@@ -462,9 +465,9 @@ class Stamp(Request):
             err = None
 
         self[self._ids[0]]._finalize(err)
-        self.Response.finalize(stamp, list(self))
+        self.response.finalize(stamp, list(self))
         self.event.set()
-        return self.Response
+        return self.response
 
 
 class Response:
@@ -479,6 +482,7 @@ class Response:
         self.nerrors = self.speed = self.nreqs = 0
         self.requests, self.errors, self.success = [], [], False
         self.start = self.end = self.shape = None
+        self.ready = False
 
     def _updspeed(self, speed, n):
         self.speed = (self.speed * (n - 1) + speed) / n
@@ -493,9 +497,9 @@ class Response:
         self.requests = reqs
         self.nreqs = len(reqs)
 
-        self.errors = self.return_errors(drop_duplicates=False)
+        self.errors = self.get_errors(drop_duplicates=False)
         self.nerrors = len(self.errors)
-        self.speed = self.return_speeds()
+        self.speed = self.get_speeds()
         self.full_speed = sum(self.speed)
         self.speed = self.full_speed / len(self.speed)
 
@@ -509,15 +513,16 @@ class Response:
                     self.start, self.end = data.index[[0, -1]]
         else:
             self.success = self.nerrors < self.nreqs
+        self.ready = True
 
-    def return_errors(self, withid=False, drop_duplicates=True):
+    def get_errors(self, withid=False, drop_duplicates=True):
         if not withid:
             errs = [r.error for r in self.requests if not r.error is None]
             return list(set(errs)) if drop_duplicates else errs
         else:
             return [(r.id, r.error) for r in self.requests]
 
-    def return_speeds(self, withid=False):
+    def get_speeds(self, withid=False):
         if not withid:
             return [r.speed for r in self.requests]
         else:

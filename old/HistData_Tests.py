@@ -240,10 +240,10 @@ class Break_HistData(ut.TestCase):
 
         self.assertListEqual([1], self.hd.R.BLACKLIST, f"{self.hd.R.BLACKLIST} should be [1]")
         self.assertListEqual(["timed out"], resp.errors, f"{resp.errors} should be ['timed out']")
-        self.assertTrue(all([isinstance(x, float) for x in resp.return_speeds()]),
-                        f"{resp.return_speeds()} should all be floats")
+        self.assertTrue(all([isinstance(x, float) for x in resp.get_speeds()]),
+                        f"{resp.get_speeds()} should all be floats")
 
-        print(resp.return_speeds(), resp.errors)
+        print(resp.get_speeds(), resp.errors)
 
 
 if __name__ == '__main__':
