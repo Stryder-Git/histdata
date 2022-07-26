@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 from datetime import datetime as dt
-
+from collections import namedtuple
 from HistData.HistData import HistData, Response
 
 # import logging
@@ -17,7 +17,7 @@ from HistData.HistData import HistData, Response
 
 @pytest.fixture(scope= "module")
 def histdata():
-    HistData.DEF_CLIENTID = 8888
+    HistData.DEF_CLIENTID = 8887
     HistData.setTimeOut(30)
     hd = HistData()
     yield hd
@@ -26,7 +26,9 @@ def histdata():
 @pytest.fixture
 def check_connect(histdata):
     if not histdata.isConnected():
-        pytest.skip("Could not connect to TWS", allow_module_level= True)
+        pytest.skip("Could not connect to TWS\n"
+                    "Either TWS is not running or you are running the tests too often\n"
+                    "since IB throttles requests.", allow_module_level= True)
     return histdata
 
 @pytest.fixture
@@ -56,12 +58,15 @@ def test_notblocking(hd_notblock):
     assert not hd_notblock.Block and not hd_notblock.directreturn
 
 
+R = namedtuple("R", ["shape", "start", "end", "errors"])
 
 @pytest.mark.parametrize("req, result", [
     (("aapl", "1h", dt(2010,1,1), dt(2010,3,5)),
-     ((668,5), dt(2010,1,4,4), dt(2010,3,5,19))),
+     R((668,5), dt(2010,1,4,4), dt(2010,3,5,19), [])),
     (("amzn", "30m", dt(2006, 10, 11, 12, 40), dt(2006, 10, 17, 14, 15)),
-     ((100,5), dt(2006,10,11,13), dt(2006,10,17,14)))
+     R((100,5), dt(2006,10,11,13), dt(2006,10,17,14), [])),
+    (("fb", "1m", dt(2005,4,1,15,23), dt(2005,4,12,11,15)),
+     R(None, None, None, ["No Data", "No Data"])),
 ])
 
 def test_get_blocking_direct_success(req, result, hd_block_direct):
@@ -70,18 +75,10 @@ def test_get_blocking_direct_success(req, result, hd_block_direct):
     assert isinstance(resp, Response)
     assert isinstance(resp.data, pd.DataFrame)
 
-    assert resp.shape == result[0]
-    assert resp.start == pd.Timestamp(result[1])
-    assert resp.end == pd.Timestamp(result[2])
-
-
-
-
-    #
-    # aapl = hd.get("AAPL", "1D", dt.datetime(2000, 1, 1), dt.datetime(2000, 1, 5))
-    # fb = hd.get("FB", "30m", "2020-01-01", "2020-01-05")
-    # assert isinstance(fb, Response)
-    # assert isinstance(fb.data, pd.DataFrame)
+    assert resp.shape == result.shape
+    assert resp.start == pd.Timestamp(result.start)
+    assert resp.end == pd.Timestamp(result.end)
+    assert resp.errors == result.errors
 
 
 
