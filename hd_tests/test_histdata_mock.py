@@ -45,9 +45,16 @@ class HistDataMock(HistData):
         ("fb", "1 min"): ["No security definition"],
     }
 
+    _test_head = {
+        "A": "20100105 09:30:00",
+        "B": "No head time stamp",
+        "C": "20000203 09:00:00",
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(self, *args, **kwargs)
         self.IBTWSConnected = True
+
     def connect(self, *args, **kwargs): return
     run = connect
 
@@ -61,6 +68,14 @@ class HistDataMock(HistData):
             d = Bar(*d)
             self.historicalData(reqId, d)
         self.historicalDataEnd(reqId, "start", "end")
+
+    def reqHeadTimeStamp(self, id_, contract, *args):
+        head = self._test_head[contract.symbol]
+        if self.isError(head):
+            self.error(id_, 0, head)
+        else:
+            self.headTimestamp(id_, head)
+
 
 
 hdm = HistDataMock()
@@ -86,6 +101,29 @@ def test_get(req, result):
     assert resp.end == (None if result.end is None else pd.Timestamp(result.end))
     assert resp.errors == result.errors
 
+
+
+@pytest.mark.parametrize("req, result", [
+    ("A", "20100105 09:30:00"),
+    ("B", "No head time stamp"),
+    ("C", "20000203 09:00:00")
+])
+
+
+def test_head(req, result):
+    resp = hdm.getHead(req)
+
+    assert isinstance(resp, Response)
+    assert isinstance(resp.data, str)
+
+    assert resp.shape is None
+    assert resp.start is None
+    assert resp.end is None
+
+    if resp:
+        assert resp.data == result
+    else:
+        assert resp.errors == [result]
 
 
 

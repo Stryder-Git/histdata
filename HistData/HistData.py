@@ -514,6 +514,7 @@ class Response:
                     self.start, self.end = data[Request._datecol].iloc[[0, -1]]
                 else:
                     self.start, self.end = data.index[[0, -1]]
+
         else:
             self.success = self.nerrors < self.nreqs
         self.ready = True
