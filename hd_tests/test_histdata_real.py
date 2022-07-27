@@ -2,12 +2,12 @@ import pandas as pd
 import pytest
 from datetime import datetime as dt
 from collections import namedtuple
-from HistData.HistData import HistData, Response
+from histdata.histdata import HistData, Response
 
 # import logging
 # import sys
 #
-# logger = logging.getLogger("HistData.HistData")
+# logger = logging.getLogger("histdata.histdata")
 # handler = logging.StreamHandler(sys.stdout)
 # handler.setLevel(1)
 # logger.addHandler(handler)

@@ -263,7 +263,7 @@ class Request:
     """ holds variables and methods needed to set up the requests
 
     THIS CLASS IS NOT SUPPOSED TO BE USED DIRECTLY, YET.
-    Calling HistData.get should result in Response object to be created that should be used
+    Calling histdata.get should result in Response object to be created that should be used
     """
 
     id = count(1)

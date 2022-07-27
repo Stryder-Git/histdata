@@ -3,7 +3,7 @@ from datetime import datetime as dt
 import pandas as pd
 import pytest
 
-from HistData.HistData import HistData, Response
+from histdata.histdata import HistData, Response
 """
 how to mock
 
