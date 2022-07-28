@@ -30,8 +30,13 @@ def _temp_block(meth):
 
     return _meth
 
+def _todt(d):
+    return pd.Timestamp(d).to_pydatetime()
+
+def _isError(err):
+    return err in HistData.ErrResponses
+
 class HistData(EWrapper, EClient):
-    logger = logger
     ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out"]
     Reqs = {}
     BLACKLIST = []
@@ -57,7 +62,7 @@ class HistData(EWrapper, EClient):
     # ibapi receiving methods #
     ###########################
     def nextValidId(self, id_):
-        self.logger.info("connected nextValidId: %s", id_)
+        logger.info("connected nextValidId: %s", id_)
         self.IBTWSConnected = True
 
     def error(self, id_, code, string):
@@ -112,7 +117,7 @@ class HistData(EWrapper, EClient):
     def blocks(self): return self._block
 
     def _log_error(self, level, id_, code, string, prefix= ""):
-        self.logger.log(level, "%s%s: %s - %s", prefix, id_, code, string)
+        logger.log(level, "%s%s: %s - %s", prefix, id_, code, string)
 
     @classmethod
     def setTimeOut(cls, seconds): cls.TIMEOUT = seconds
@@ -120,7 +125,7 @@ class HistData(EWrapper, EClient):
     @staticmethod
     def isResponse(obj): return isinstance(obj, Response)
 
-    def isError(self, err_msg): return err_msg in self.ErrResponses
+    def isError(self, err_msg): return _isError(err_msg)
 
     def _transmit_request(self, request):
         isStamp = isinstance(request, Stamp)
@@ -130,10 +135,10 @@ class HistData(EWrapper, EClient):
             self.Reqs[req.id] = request
 
             if self._threadwait: request.event.clear()
-            self.logger.debug("SENDING REQUEST --- %s", req)
+            logger.debug("SENDING REQUEST --- %s", req)
             func(*req)
             if self._threadwait and not request.event.wait(self.TIMEOUT):
-                self.logger.info("EVENT TIMEOUT --- request id: %s", req.id)
+                logger.info("EVENT TIMEOUT --- request id: %s", req.id)
                 self.BLACKLIST.append(req.id)
                 if isStamp: request.setEnd("timed out")
                 else: request.setEnd(req.id, "timed out")
@@ -151,13 +156,8 @@ class HistData(EWrapper, EClient):
         request = Stamp(symbol, type_, onlyRTH, format_)
         return self.transmit_request(request)
 
-    def _cleandate(self, d):
-        if isinstance(d, str):
-            return dt.datetime.strptime(d, "%Y-%m-%d")
-        else: return d
-
     def get(self, symbol, timeframe, start, end, format_=1, onlyRTH=False, type_="TRADES"):
-        start, end = self._cleandate(start), self._cleandate(end)
+        start, end = _todt(start), _todt(end)
         request = Request(symbol, timeframe, start, end, format_, onlyRTH, type_)
         return self.transmit_request(request)
 
@@ -165,7 +165,7 @@ class HistData(EWrapper, EClient):
 
     def _blacklist(self, id_):
         if id_ in self.BLACKLIST:
-            self.logger.info(f"{self[id_].symbol}: {self[id_].orig_tf} @{self[id_][id_].t_requested}\n"
+            logger.info(f"{self[id_].symbol}: {self[id_].orig_tf} @{self[id_][id_].t_requested}\n"
                                f"request: {self[id_][id_].req}\n"
                                f"was received after {time() - self[id_][id_].t_requested}s but TIMEOUT was {self.TIMEOUT}")
             return True
@@ -189,6 +189,8 @@ class HistData(EWrapper, EClient):
     @_temp_block
     def find_first(self, sym, timeframe):
         # first try to get a headtimestamp
+        resp = Response(sym, timeframe)
+
         left, right = self.getHead(sym), self.today
         attempt = count(1)
         while "timed out" in left.errors and next(attempt) < 3:
@@ -199,14 +201,14 @@ class HistData(EWrapper, EClient):
             if "No head time stamp" in left.errors:
                 left = pd.Timestamp("1990-01-01")
             elif "invalid symbol" in left.errors:
-                return "invalid symbol"
+                return resp.finalize("invalid symbol")
             elif "timed out" in left.errors:
-                return "timed out"
+                return resp.finalize("timed out")
         else: left = pd.Timestamp(left.data)
 
         # make the first attempt
         found = self.get(sym, timeframe, left, left)
-        if found:  return left
+        if found: return resp.finalize(left)
 
         # track last_test to break out if same date gets tested again, potential infinite loop
         test = self._calc_midpoint(left, right)
@@ -219,9 +221,9 @@ class HistData(EWrapper, EClient):
 
             test = self._calc_midpoint(left, right)
             # if _calcmidpoint returns the same date, left and right must be very close anyway
-            if last_test == test: return test
+            if last_test == test: break
 
-        return test
+        return resp.finalize(test)
 
     def block(self, bool_= True):
         self._block = bool_
@@ -462,10 +464,8 @@ class Stamp(Request):
         self.response = Response(self.symbol, self.timeframe)
 
     def setEnd(self, stamp):
-        if stamp in HistData.ErrResponses:
-            err = stamp
-        else:
-            err = None
+        if _isError(stamp): err = stamp
+        else: err = None
 
         self[self._ids[0]]._finalize(err)
         self.response.finalize(stamp, list(self))
@@ -481,22 +481,32 @@ class Response:
     def __init__(self, sym, tf):
         self.sym = sym
         self.tf = tf
-        self.data = pd.DataFrame()
-        self.nerrors = self.speed = self.nreqs = 0
+        self.data = self.start = self.end = self.shape = None
+        self.nerrors = self.speed = self.full_speed = self.nreqs = 0
         self.requests, self.errors, self.success = [], [], False
-        self.start = self.end = self.shape = None
         self.ready = False
 
     def _updspeed(self, speed, n):
         self.speed = (self.speed * (n - 1) + speed) / n
 
-    def finalize(self, data, reqs):
+    def finalize(self, data, reqs= None):
         """ saves the returned data and sets the success attribute
         if a dataframe was returned, it's considered a success
         if not then its only a success if there are less errors than
         requests"""
         logger.info("finalizing response with: %s", data)
-        self.data = data
+        # find_first head response
+        if reqs is None:
+            if _isError(data):
+                self.errors = [data]
+                self.nerrors = 1
+            else:
+                self.data = _todt(data)
+                self.success = True
+
+            self.ready = True
+            return self
+
         self.requests = reqs
         self.nreqs = len(reqs)
 
@@ -506,18 +516,21 @@ class Response:
         self.full_speed = sum(self.speed)
         self.speed = self.full_speed / len(self.speed)
 
+        # historical data request always returns dataframe
         if isinstance(data, pd.DataFrame):
+            self.data = data
             if data.shape[0]:
-                self.success = True
                 self.shape = data.shape
-                if Request._datecol in data.columns:
-                    self.start, self.end = data[Request._datecol].iloc[[0, -1]]
-                else:
-                    self.start, self.end = data.index[[0, -1]]
+                self.start, self.end = data.index[[0, -1]]
+                self.success = True
 
-        else:
-            self.success = self.nerrors < self.nreqs
+        # getHead might return an error message instead of a date
+        elif isinstance(data, str) and not _isError(data):
+            self.data = _todt(data)
+            self.success = True
+
         self.ready = True
+        return self
 
     def get_errors(self, withid=False, drop_duplicates=True):
         if not withid:
