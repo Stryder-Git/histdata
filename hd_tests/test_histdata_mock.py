@@ -78,7 +78,7 @@ class HistDataMock(HistData):
 
 
 
-hdm = HistDataMock()
+hdm = HistDataMock(7777)
 R = namedtuple("R", ["shape", "start", "end", "errors"])
 
 @pytest.mark.parametrize("req, result", [
@@ -108,20 +108,17 @@ def test_get(req, result):
     ("B", "No head time stamp"),
     ("C", "20000203 09:00:00")
 ])
-
-
 def test_head(req, result):
     resp = hdm.getHead(req)
 
     assert isinstance(resp, Response)
-    assert isinstance(resp.data, str)
-
     assert resp.shape is None
     assert resp.start is None
     assert resp.end is None
 
     if resp:
-        assert resp.data == result
+        assert isinstance(resp.data, dt)
+        assert resp.data == pd.Timestamp(result).to_pydatetime()
     else:
         assert resp.errors == [result]
 

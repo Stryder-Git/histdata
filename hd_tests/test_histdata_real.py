@@ -17,9 +17,8 @@ from histdata.histdata import HistData, Response
 
 @pytest.fixture(scope= "module")
 def histdata():
-    HistData.DEF_CLIENTID = 8887
     HistData.setTimeOut(10)
-    hd = HistData()
+    hd = HistData(7777)
     if not hd.isConnected():
         pytest.skip("Not connected to TWS\n", allow_module_level= True)
     yield hd
