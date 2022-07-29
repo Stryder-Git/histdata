@@ -229,10 +229,6 @@ class HistData(EWrapper, EClient):
         """ overwrite in child class """
         return response
 
-    def tf_sym(self, id_):
-        try: return self[id_].timeframe, self[id_].orig_sym
-        except KeyError: return "Not a used id", "Not a used id"
-
     def clear(self): self.Reqs.clear()
 
     def __getitem__(self, id_): return self.Reqs[id_]
@@ -346,14 +342,13 @@ class Request:
 
     def __init__(self, symbol, timeframe, start, end, format_, onlyRTH, type_):
         self.contract = self.makeContract(symbol)
+        self.response = Response(self.contract, timeframe)
+
         self.start, self.end, self.nstart, self.nend = self.set_request_dates(start, end)
         ndays = self.date_duration(start, end)[0]  # the duration for IB format
         self.nreqs = self.calc_nreqs(timeframe, ndays)  # necessary number of reqs
 
-        self.timeframe = u.ibtfs[pd.Timedelta(timeframe)]
-        self.orig_tf = timeframe
         self.data = []
-
         self.ib_requests = {}
         # since the request might need to be split, create each request
         add = (self.nend - self.nstart) / self.nreqs
@@ -363,10 +358,10 @@ class Request:
             duration, end = self.date_duration(thisstart, thisend)[1], self._ib(thisend)
 
             id_ = next(self.id)
-            self.ib_requests[id_] = IBRequest(id_, self.contract, end, duration, self.timeframe,
+            self.ib_requests[id_] = IBRequest(id_, self.contract, end, duration,
+                                              u.ibtfs[pd.Timedelta(timeframe)],
                                               type_, int(onlyRTH), format_, False, [])
 
-        self.response = Response(self.contract, self.orig_tf)
         self.current, self.received = -1, 0
         self.event = Event()
 
