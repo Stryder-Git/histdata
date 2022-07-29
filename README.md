@@ -14,6 +14,12 @@ import sys
 
 
 ```python
+from pandas import options
+options.display.notebook_repr_html = False
+```
+
+
+```python
 hd = HistData(1)
 
 hd.isConnected()
@@ -65,132 +71,21 @@ aapl.data
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>open</th>
-      <th>high</th>
-      <th>low</th>
-      <th>close</th>
-      <th>volume</th>
-    </tr>
-    <tr>
-      <th>date</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>1980-12-15</th>
-      <td>0.975</td>
-      <td>0.980</td>
-      <td>0.975</td>
-      <td>0.975</td>
-      <td>219856</td>
-    </tr>
-    <tr>
-      <th>1980-12-16</th>
-      <td>0.900</td>
-      <td>0.905</td>
-      <td>0.900</td>
-      <td>0.900</td>
-      <td>132160</td>
-    </tr>
-    <tr>
-      <th>1980-12-17</th>
-      <td>0.925</td>
-      <td>0.930</td>
-      <td>0.925</td>
-      <td>0.925</td>
-      <td>108052</td>
-    </tr>
-    <tr>
-      <th>1980-12-18</th>
-      <td>0.950</td>
-      <td>0.955</td>
-      <td>0.950</td>
-      <td>0.950</td>
-      <td>91812</td>
-    </tr>
-    <tr>
-      <th>1980-12-19</th>
-      <td>1.010</td>
-      <td>1.015</td>
-      <td>1.010</td>
-      <td>1.010</td>
-      <td>60788</td>
-    </tr>
-    <tr>
-      <th>...</th>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-    </tr>
-    <tr>
-      <th>1989-12-22</th>
-      <td>1.305</td>
-      <td>1.330</td>
-      <td>1.285</td>
-      <td>1.305</td>
-      <td>461468</td>
-    </tr>
-    <tr>
-      <th>1989-12-26</th>
-      <td>1.270</td>
-      <td>1.315</td>
-      <td>1.260</td>
-      <td>1.270</td>
-      <td>338212</td>
-    </tr>
-    <tr>
-      <th>1989-12-27</th>
-      <td>1.255</td>
-      <td>1.275</td>
-      <td>1.250</td>
-      <td>1.255</td>
-      <td>642516</td>
-    </tr>
-    <tr>
-      <th>1989-12-28</th>
-      <td>1.235</td>
-      <td>1.260</td>
-      <td>1.225</td>
-      <td>1.235</td>
-      <td>378140</td>
-    </tr>
-    <tr>
-      <th>1989-12-29</th>
-      <td>1.260</td>
-      <td>1.275</td>
-      <td>1.230</td>
-      <td>1.260</td>
-      <td>381024</td>
-    </tr>
-  </tbody>
-</table>
-<p>2285 rows × 5 columns</p>
-</div>
+                 open   high    low  close  volume
+    date                                          
+    1980-12-15  0.975  0.980  0.975  0.975  219856
+    1980-12-16  0.900  0.905  0.900  0.900  132160
+    1980-12-17  0.925  0.930  0.925  0.925  108052
+    1980-12-18  0.950  0.955  0.950  0.950   91812
+    1980-12-19  1.010  1.015  1.010  1.010   60788
+    ...           ...    ...    ...    ...     ...
+    1989-12-22  1.305  1.330  1.285  1.305  461468
+    1989-12-26  1.270  1.315  1.260  1.270  338212
+    1989-12-27  1.255  1.275  1.250  1.255  642516
+    1989-12-28  1.235  1.260  1.225  1.235  378140
+    1989-12-29  1.260  1.275  1.230  1.260  381024
+    
+    [2285 rows x 5 columns]
 
 
 
@@ -217,43 +112,9 @@ aapl.data
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>open</th>
-      <th>high</th>
-      <th>low</th>
-      <th>close</th>
-      <th>volume</th>
-    </tr>
-    <tr>
-      <th>date</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
-</div>
+    Empty DataFrame
+    Columns: [open, high, low, close, volume]
+    Index: []
 
 
 
@@ -295,132 +156,21 @@ aapl.data
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>open</th>
-      <th>high</th>
-      <th>low</th>
-      <th>close</th>
-      <th>volume</th>
-    </tr>
-    <tr>
-      <th>date</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>2004-01-26 09:00:00</th>
-      <td>0.80</td>
-      <td>0.81</td>
-      <td>0.80</td>
-      <td>0.81</td>
-      <td>130564</td>
-    </tr>
-    <tr>
-      <th>2004-01-26 10:00:00</th>
-      <td>0.81</td>
-      <td>0.81</td>
-      <td>0.80</td>
-      <td>0.81</td>
-      <td>209300</td>
-    </tr>
-    <tr>
-      <th>2004-01-26 11:00:00</th>
-      <td>0.81</td>
-      <td>0.82</td>
-      <td>0.81</td>
-      <td>0.81</td>
-      <td>168896</td>
-    </tr>
-    <tr>
-      <th>2004-01-26 12:00:00</th>
-      <td>0.81</td>
-      <td>0.82</td>
-      <td>0.81</td>
-      <td>0.81</td>
-      <td>127764</td>
-    </tr>
-    <tr>
-      <th>2004-01-26 13:00:00</th>
-      <td>0.81</td>
-      <td>0.82</td>
-      <td>0.81</td>
-      <td>0.82</td>
-      <td>110740</td>
-    </tr>
-    <tr>
-      <th>...</th>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-    </tr>
-    <tr>
-      <th>2004-07-23 15:00:00</th>
-      <td>1.10</td>
-      <td>1.10</td>
-      <td>1.09</td>
-      <td>1.10</td>
-      <td>324828</td>
-    </tr>
-    <tr>
-      <th>2004-07-23 16:00:00</th>
-      <td>1.09</td>
-      <td>1.10</td>
-      <td>1.09</td>
-      <td>1.10</td>
-      <td>17780</td>
-    </tr>
-    <tr>
-      <th>2004-07-23 17:00:00</th>
-      <td>1.10</td>
-      <td>1.10</td>
-      <td>1.09</td>
-      <td>1.09</td>
-      <td>1176</td>
-    </tr>
-    <tr>
-      <th>2004-07-23 18:00:00</th>
-      <td>1.10</td>
-      <td>1.10</td>
-      <td>1.10</td>
-      <td>1.10</td>
-      <td>56</td>
-    </tr>
-    <tr>
-      <th>2004-07-23 19:00:00</th>
-      <td>1.10</td>
-      <td>1.10</td>
-      <td>1.10</td>
-      <td>1.10</td>
-      <td>0</td>
-    </tr>
-  </tbody>
-</table>
-<p>1433 rows × 5 columns</p>
-</div>
+                         open  high   low  close  volume
+    date                                                
+    2004-01-26 09:00:00  0.80  0.81  0.80   0.81  130564
+    2004-01-26 10:00:00  0.81  0.81  0.80   0.81  209300
+    2004-01-26 11:00:00  0.81  0.82  0.81   0.81  168896
+    2004-01-26 12:00:00  0.81  0.82  0.81   0.81  127764
+    2004-01-26 13:00:00  0.81  0.82  0.81   0.82  110740
+    ...                   ...   ...   ...    ...     ...
+    2004-07-23 15:00:00  1.10  1.10  1.09   1.10  324828
+    2004-07-23 16:00:00  1.09  1.10  1.09   1.10   17780
+    2004-07-23 17:00:00  1.10  1.10  1.09   1.09    1176
+    2004-07-23 18:00:00  1.10  1.10  1.10   1.10      56
+    2004-07-23 19:00:00  1.10  1.10  1.10   1.10       0
+    
+    [1433 rows x 5 columns]
 
 
 
@@ -491,132 +241,21 @@ aapl.data
 
 
 
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>open</th>
-      <th>high</th>
-      <th>low</th>
-      <th>close</th>
-      <th>volume</th>
-    </tr>
-    <tr>
-      <th>date</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>2004-01-23 09:00:00</th>
-      <td>0.79</td>
-      <td>0.81</td>
-      <td>0.79</td>
-      <td>0.80</td>
-      <td>124712</td>
-    </tr>
-    <tr>
-      <th>2004-01-23 10:00:00</th>
-      <td>0.80</td>
-      <td>0.81</td>
-      <td>0.80</td>
-      <td>0.81</td>
-      <td>184912</td>
-    </tr>
-    <tr>
-      <th>2004-01-23 11:00:00</th>
-      <td>0.81</td>
-      <td>0.81</td>
-      <td>0.80</td>
-      <td>0.81</td>
-      <td>130508</td>
-    </tr>
-    <tr>
-      <th>2004-01-23 12:00:00</th>
-      <td>0.81</td>
-      <td>0.81</td>
-      <td>0.80</td>
-      <td>0.80</td>
-      <td>160804</td>
-    </tr>
-    <tr>
-      <th>2004-01-23 13:00:00</th>
-      <td>0.81</td>
-      <td>0.81</td>
-      <td>0.80</td>
-      <td>0.80</td>
-      <td>59192</td>
-    </tr>
-    <tr>
-      <th>...</th>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-      <td>...</td>
-    </tr>
-    <tr>
-      <th>2004-12-31 15:00:00</th>
-      <td>2.31</td>
-      <td>2.32</td>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>282212</td>
-    </tr>
-    <tr>
-      <th>2004-12-31 16:00:00</th>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>2.29</td>
-      <td>2.30</td>
-      <td>69356</td>
-    </tr>
-    <tr>
-      <th>2004-12-31 17:00:00</th>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>336</td>
-    </tr>
-    <tr>
-      <th>2004-12-31 18:00:00</th>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>23184</td>
-    </tr>
-    <tr>
-      <th>2004-12-31 19:00:00</th>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>2.30</td>
-      <td>0</td>
-    </tr>
-  </tbody>
-</table>
-<p>2776 rows × 5 columns</p>
-</div>
+                         open  high   low  close  volume
+    date                                                
+    2004-01-23 09:00:00  0.79  0.81  0.79   0.80  124712
+    2004-01-23 10:00:00  0.80  0.81  0.80   0.81  184912
+    2004-01-23 11:00:00  0.81  0.81  0.80   0.81  130508
+    2004-01-23 12:00:00  0.81  0.81  0.80   0.80  160804
+    2004-01-23 13:00:00  0.81  0.81  0.80   0.80   59192
+    ...                   ...   ...   ...    ...     ...
+    2004-12-31 15:00:00  2.31  2.32  2.30   2.30  282212
+    2004-12-31 16:00:00  2.30  2.30  2.29   2.30   69356
+    2004-12-31 17:00:00  2.30  2.30  2.30   2.30     336
+    2004-12-31 18:00:00  2.30  2.30  2.30   2.30   23184
+    2004-12-31 19:00:00  2.30  2.30  2.30   2.30       0
+    
+    [2776 rows x 5 columns]
 
 
 
@@ -643,7 +282,7 @@ aapl.speed # average speed
 
 
 
-    0.36375367641448975
+    0.32992684841156006
 
 
 
@@ -655,7 +294,7 @@ aapl.get_speeds() # speed for each request
 
 
 
-    [0.13996601104736328, 0.5875413417816162]
+    [0.13506293296813965, 0.5247907638549805]
 
 
 
@@ -749,16 +388,16 @@ for sym, tf in product(("aapl", "amzn", "nvda"), ("1D", "30m")):
     requesting nvda 30m
     received aapl 1D
     saved aapl_1D_2005-01-03_2005-12-30.csv
-    received nvda 1D
-    saved nvda_1D_2005-01-03_2005-12-30.csv
     received amzn 1D
     saved amzn_1D_2005-01-03_2005-12-30.csv
-    received aapl 30m
-    saved aapl_30m_2005-01-03_2005-12-30.csv
+    received nvda 1D
+    saved nvda_1D_2005-01-03_2005-12-30.csv
     received nvda 30m
     saved nvda_30m_2005-01-03_2005-12-30.csv
     received amzn 30m
     saved amzn_30m_2005-01-03_2005-12-30.csv
+    received aapl 30m
+    saved aapl_30m_2005-01-03_2005-12-30.csv
     
 
 
