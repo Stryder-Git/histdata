@@ -1,22 +1,21 @@
-### Pakca
+### Wrapper for InteractiveBrokers' ibapi to make requesting historical price data easier
 
-To run this, you will require a running instance of the Trader Workstation of Interactive Brokers
--> https://www.interactivebrokers.com/en/trading/tws-updateable-stable.php
+This readme is based on examples.ipynb. To run it, you will require a running instance of the Trader Workstation of Interactive Brokers (https://www.interactivebrokers.com/en/trading/tws-updateable-stable.php)
 
 
 ```python
 from histdata import HistData
 import datetime as dt
 from time import sleep
+from itertools import product
+import logging
+import sys
 ```
 
 
 ```python
-hd = HistData(clientId= 1)
-```
+hd = HistData(1)
 
-
-```python
 hd.isConnected()
 ```
 
@@ -32,11 +31,9 @@ hd.isConnected()
 
 ```python
 aapl = hd.getHead("aapl") # this will return a Response object
-```
 
-
-```python
-aapl.data
+first = aapl.data
+first
 ```
 
 
@@ -48,12 +45,9 @@ aapl.data
 
 
 ```python
-aapl = hd.get("aapl", "1D", aapl.data, "1990-01-01")
-```
+aapl = hd.get("aapl", "1D", first, "1990-01-01")
 
-
-```python
-aapl.success
+aapl.success # will be true when any data has been received
 ```
 
 
@@ -200,15 +194,11 @@ aapl.data
 
 
 
-##### But this does not apply to all timeframes
+### But this does not apply to all timeframes
 
 
 ```python
-aapl = hd.get("aapl", "1h", "1980-12-12", "1985-01-01")
-```
-
-
-```python
+aapl = hd.get("aapl", "1h", first, first + dt.timedelta(days= 90))
 aapl.success
 ```
 
@@ -272,10 +262,7 @@ aapl.data
 
 ```python
 aapl = hd.find_first("aapl", "1h")
-```
 
-
-```python
 aapl.data
 ```
 
@@ -289,10 +276,7 @@ aapl.data
 
 ```python
 aapl = hd.get("aapl", "1h", aapl.data, aapl.data + dt.timedelta(days= 180))
-```
 
-
-```python
 aapl.success
 ```
 
@@ -472,19 +456,6 @@ hd.blocks
 
 ```python
 hd.block()
-
-hd.blocks
-```
-
-
-
-
-    True
-
-
-
-
-```python
 aapl = hd.get("aapl", "1h", "2005-01-01", "2006-01-01") # this blocks until the data is received
 aapl.ready  # so this is only run when it's ready
 ```
@@ -513,8 +484,6 @@ aapl.data
 ```
 
     False
-    waiting
-    waiting
     waiting
     received:
     
@@ -674,7 +643,7 @@ aapl.speed # average speed
 
 
 
-    2.9005972146987915
+    0.36375367641448975
 
 
 
@@ -686,7 +655,7 @@ aapl.get_speeds() # speed for each request
 
 
 
-    [0.1390695571899414, 5.662124872207642]
+    [0.13996601104736328, 0.5875413417816162]
 
 
 
@@ -710,28 +679,27 @@ aapl.get_errors(withid= True)
 
 
 
-    [(22, 'No Data'), (23, None)]
+    [(19, 'No Data'), (20, None)]
 
 
 
 ----
 ## Create a data saver
+How to:
 
-
-```python
-from histdata import HistData
-import datetime as dt
-from time import sleep
-from itertools import product
-import logging
-import sys
-```
+    * Inherit from HistData
+    * Override the response method, which is called when a full request has been received
 
 
 ```python
 handler = logging.StreamHandler(sys.stdout)
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
+```
+
+
+```python
+logger.setLevel(1)
 ```
 
 
@@ -758,30 +726,13 @@ class Saver(HistData):
 
 
 ```python
-saver = Saver(clientId= 2)
-```
-
-
-```python
-logger.setLevel(1)
+saver = Saver(2)
 ```
 
 
 ```python
 saver.block(False)
 ```
-
-
-```python
-saver.blocks
-```
-
-
-
-
-    False
-
-
 
 
 ```python
@@ -798,16 +749,16 @@ for sym, tf in product(("aapl", "amzn", "nvda"), ("1D", "30m")):
     requesting nvda 30m
     received aapl 1D
     saved aapl_1D_2005-01-03_2005-12-30.csv
-    received amzn 1D
-    saved amzn_1D_2005-01-03_2005-12-30.csv
     received nvda 1D
     saved nvda_1D_2005-01-03_2005-12-30.csv
+    received amzn 1D
+    saved amzn_1D_2005-01-03_2005-12-30.csv
+    received aapl 30m
+    saved aapl_30m_2005-01-03_2005-12-30.csv
     received nvda 30m
     saved nvda_30m_2005-01-03_2005-12-30.csv
     received amzn 30m
     saved amzn_30m_2005-01-03_2005-12-30.csv
-    received aapl 30m
-    saved aapl_30m_2005-01-03_2005-12-30.csv
     
 
 
