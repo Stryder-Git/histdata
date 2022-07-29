@@ -97,7 +97,7 @@ class HistData(EWrapper, EClient):
             self._log_error(logging.DEBUG, id_, code, string, prefix="UNCAUGHT --- ")
 
     def headTimestamp(self, id_, stamp):
-        response = self[id_].setEnd(stamp)
+        response = self[id_].setEnd(id_, stamp)
         if self._skip_response: return
         self.response(response)
 
@@ -110,7 +110,6 @@ class HistData(EWrapper, EClient):
         response = self[id_].setEnd(id_, end if end in self.ErrResponses else None)
         if response is None or self._skip_response: return
         self.response(response)
-
 
     @property
     def blocks(self): return self._block
@@ -138,8 +137,7 @@ class HistData(EWrapper, EClient):
             if self._threadwait and not request.event.wait(self.TIMEOUT):
                 logger.info("EVENT TIMEOUT --- request id: %s", req.id)
                 self.BLACKLIST.append(req.id)
-                if isStamp: request.setEnd("timed out")
-                else: request.setEnd(req.id, "timed out")
+                request.setEnd(req.id, "timed out")
 
     def transmit_request(self, request):
         if self._block:
@@ -448,18 +446,17 @@ class Stamp(Request):
     def __init__(self, symbol, type_, only_rth, format_):
         self.contract, self.symbol = self.makeContract(symbol)
         id_ = next(self.id)
-        self._ids = [id_]
         self.ib_requests = {id_: IBRequest(id_, self.contract, type_, only_rth, format_)}
 
         self.event = Event()
         self.timeframe = "stamp"
         self.response = Response(self.symbol, self.timeframe)
 
-    def setEnd(self, stamp):
+    def setEnd(self, id_, stamp):
         if _isError(stamp): err = stamp
         else: err = None
 
-        self[self._ids[0]]._finalize(err)
+        self[id_]._finalize(err)
         self.response.finalize(stamp, list(self))
         self.event.set()
         return self.response
