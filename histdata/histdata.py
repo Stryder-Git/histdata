@@ -6,6 +6,7 @@ from ibapi.contract import Contract
 from threading import Thread, Event
 import logging
 logger = logging.getLogger(__name__)
+import histdata._utils as u
 
 from math import ceil
 import datetime as dt
@@ -14,7 +15,6 @@ import pandas_market_calendars as mcal
 from itertools import count
 from functools import wraps
 from time import time
-import _utils as u
 
 NYSE = mcal.get_calendar("NYSE")
 FOURDAYS = pd.Timedelta("4D")
@@ -275,7 +275,7 @@ class Request:
 
     @classmethod
     def makeContract(cls, symbol):
-        if isinstance(symbol, Contract): return symbol, symbol.symbol
+        if isinstance(symbol, Contract): return symbol
 
         contract = Contract()
 
@@ -289,13 +289,13 @@ class Request:
                     raise ValueError(f"{att} is not a valid attribute for a Contract")
 
                 setattr(contract, att, value)
-            return contract, contract.symbol
+            return contract
 
         contract.symbol = symbol
         contract.secType = "STK"
         contract.currency = "USD"
         contract.exchange = "SMART"
-        return contract, symbol
+        return contract
 
     def set_request_dates(self, start, end):
         """
@@ -345,7 +345,7 @@ class Request:
         return dt.datetime.strftime(dte, cls.IBDT)
 
     def __init__(self, symbol, timeframe, start, end, format_, onlyRTH, type_):
-        self.contract, self.symbol = self.makeContract(symbol)
+        self.contract = self.makeContract(symbol)
         self.start, self.end, self.nstart, self.nend = self.set_request_dates(start, end)
         ndays = self.date_duration(start, end)[0]  # the duration for IB format
         self.nreqs = self.calc_nreqs(timeframe, ndays)  # necessary number of reqs
@@ -366,7 +366,7 @@ class Request:
             self.ib_requests[id_] = IBRequest(id_, self.contract, end, duration, self.timeframe,
                                               type_, int(onlyRTH), format_, False, [])
 
-        self.response = Response(self.symbol, self.orig_tf)
+        self.response = Response(self.contract, self.orig_tf)
         self.current, self.received = -1, 0
         self.event = Event()
 
@@ -424,13 +424,13 @@ class Request:
 # noinspection PyMissingConstructor
 class Stamp(Request):
     def __init__(self, symbol, type_, only_rth, format_):
-        self.contract, self.symbol = self.makeContract(symbol)
+        self.contract = self.makeContract(symbol)
         id_ = next(self.id)
         self.ib_requests = {id_: IBRequest(id_, self.contract, type_, only_rth, format_)}
 
         self.event = Event()
         self.timeframe = "stamp"
-        self.response = Response(self.symbol, self.timeframe)
+        self.response = Response(self.contract, self.timeframe)
 
     def setEnd(self, id_, stamp):
         if _isError(stamp): err = stamp
@@ -447,8 +447,9 @@ class Response:
     calling the Manager's getHistData method or through the overwritten
     response method"""
 
-    def __init__(self, sym, tf):
-        self.sym = sym
+    def __init__(self, contract, tf):
+        self.contract = contract
+        self.sym = contract.symbol
         self.tf = tf
         self.data = self.start = self.end = self.shape = None
         self.nerrors = self.speed = self.full_speed = self.nreqs = 0
