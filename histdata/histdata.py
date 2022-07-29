@@ -14,6 +14,7 @@ import pandas_market_calendars as mcal
 from itertools import count
 from functools import wraps
 from time import time
+import _utils as u
 
 NYSE = mcal.get_calendar("NYSE")
 FOURDAYS = pd.Timedelta("4D")
@@ -256,7 +257,8 @@ class IBRequest:
     def __repr__(self): return str(self.req)
 
 
-_defcontract = Contract()
+class NotValid: pass
+
 class Request:
     """ holds variables and methods needed to set up the requests
 
@@ -268,21 +270,8 @@ class Request:
     PRICECOLS = ["date", "open", "high", "low", "close", "volume"]
     _datecol = PRICECOLS[0]
     IBDT = "%Y%m%d %H:%M:%S"
-    ibtfs = dict(s="sec", m="min", h="hour", D="day", W="W", M="M")
-    validibtfs = "1 secs, 5 secs, 10 secs, 15 secs, 30 secs, 1 min, 2 mins, 3 mins, 5 mins, 10 mins, 15 mins, 20 mins," \
-                 " 30 mins, 1 hour, 2 hours, 3 hours, 4 hours, 8 hours, 1 day, 1W, 1M".replace(", ", ",").split(",")
-
     ratios = dict(s=dt.timedelta(seconds=1), m=dt.timedelta(minutes=1), h=dt.timedelta(hours=1),
                   D=dt.timedelta(minutes=60 * 16), W=dt.timedelta(minutes=60 * 16 * 5), M=dt.timedelta(days=60 * 16 * 20))
-
-
-    _contract_defaults = {k: getattr(_defcontract, k) for k in ['comboLegs', 'comboLegsDescrip', 'conId', 'currency',
-                                                                   'deltaNeutralContract', 'exchange', 'includeExpired',
-                                                                   'lastTradeDateOrContractMonth', 'localSymbol', 'multiplier',
-                                                                   'primaryExchange', 'right', 'secId', 'secIdType', 'secType',
-                                                                   'strike', 'symbol', 'tradingClass']}
-
-    _contract_defaults.update({"secType": "STK", "currency": "USD", "exchange": "SMART"})
 
     @classmethod
     def makeContract(cls, symbol):
@@ -291,9 +280,15 @@ class Request:
         contract = Contract()
 
         if isinstance(symbol, dict):
-            contract.symbol = symbol["symbol"]
-            for att, default in cls._contract_defaults.items():
-                setattr(contract, att, symbol.get(att, default))
+            try: contract.symbol = symbol["symbol"]
+            except KeyError as e:
+                raise KeyError("You need a symbol in the contract dictionary") from e
+
+            for att, value in symbol.items():
+                if getattr(contract, att, NotValid) is NotValid:
+                    raise ValueError(f"{att} is not a valid attribute for a Contract")
+
+                setattr(contract, att, value)
             return contract, contract.symbol
 
         contract.symbol = symbol
@@ -341,24 +336,9 @@ class Request:
         return ndays, duration
 
     def calc_nreqs(self, tf, ndays):
-
         tfdelta = self.ratios[tf[-1]] * int(tf[:-1])
         nrows = ceil(ndays * self.ratios["D"] / tfdelta)
         return (nrows // 5000) + 1
-
-    @classmethod
-    def _tf(cls, tf):
-        x = int(tf[:-1])
-        label = cls.ibtfs[tf[-1]]
-
-        if x == 1:
-            label = f"{x} {label}"
-        else:
-            label = f"{x} {label}s"
-
-        if not label in cls.validibtfs:
-            raise ValueError(f"only the following tfs are allowed:\n{cls.validibtfs}")
-        return label
 
     @classmethod
     def _ib(cls, dte):
@@ -370,7 +350,7 @@ class Request:
         ndays = self.date_duration(start, end)[0]  # the duration for IB format
         self.nreqs = self.calc_nreqs(timeframe, ndays)  # necessary number of reqs
 
-        self.timeframe = self._tf(timeframe)
+        self.timeframe = u.ibtfs[pd.Timedelta(timeframe)]
         self.orig_tf = timeframe
         self.data = []
 
