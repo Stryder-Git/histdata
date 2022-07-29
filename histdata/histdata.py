@@ -282,7 +282,7 @@ class Request:
         if isinstance(symbol, dict):
             try: contract.symbol = symbol["symbol"]
             except KeyError as e:
-                raise KeyError("You need a symbol in the contract dictionary") from e
+                raise ValueError("You need a symbol in the contract dictionary") from e
 
             for att, value in symbol.items():
                 if getattr(contract, att, NotValid) is NotValid:

@@ -32,3 +32,11 @@ def test_make_contract(specs, contract):
 
     for att in filter(lambda x: x[0] != "_", dir(contract)):
         assert getattr(calced, att) == getattr(contract, att)
+
+
+def test_make_contract_fail():
+    with pytest.raises(ValueError):
+        Request.makeContract({"nosym": 1})
+
+    with pytest.raises(ValueError):
+        Request.makeContract({"symbol": "amzn", "notvalid": 1})
