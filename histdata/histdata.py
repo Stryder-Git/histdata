@@ -406,17 +406,17 @@ class Request:
         self[id_]._finalize(err)
         self.received += 1
         ndata = len(self.data)
-        logger.debug("RECEIVED IB-REQUEST --- id: %s nreceived: %s error: %s rows of data: %s",
-                     id_, self.received, err, ndata)
+        logger.debug("RECEIVED IB-REQUEST --- id: %s nreceived: %s/%s error: %s rows of data: %s",
+                     id_, self.received, self.nreqs, err, ndata)
         if self.received == self.nreqs:
             logger.info("RECEIVED REQUEST --- rows of data: %s", ndata)
             if ndata: logger.debug("REQUEST DATA --- from %s to %s", self.data[0][0], self.data[-1][0])
             # this makes the dataframe, sorts it, drops duplicates and trims it
-            self.data = pd.DataFrame(self.data, columns=self.PRICECOLS)
+            data = pd.DataFrame(self.data, columns=self.PRICECOLS)
 
             d = self._datecol
-            self.data[d] = pd.to_datetime(self.data[d], infer_datetime_format=True)
-            self.data = self.data.sort_values(d).drop_duplicates(d)
+            data[d] = pd.to_datetime(data[d], infer_datetime_format=True)
+            data = data.sort_values(d).drop_duplicates(d)
 
             # if a date (no time) was requested, adjust the end cut off to include the whole day
             if self.end.time() == dt.time(0):
@@ -424,12 +424,12 @@ class Request:
             else:
                 end = self.end
             # trim it
-            mask = (self.start <= self.data[d]) & (self.data[d] < end)
-            self.data = self.data[mask]
-            self.data.set_index(d, inplace=True)
+            mask = (self.start <= data[d]) & (data[d] < end)
+            data = data[mask]
+            data.set_index(d, inplace=True)
 
             # finish the response object
-            self.response.finalize(self.data, list(self))
+            self.response.finalize(data, list(self))
             self.event.set()
             return self.response
 
