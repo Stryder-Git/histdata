@@ -19,12 +19,14 @@ NYSE = mcal.get_calendar("NYSE")
 FOURDAYS = pd.Timedelta("4D")
 WEEK = pd.Timedelta("7D")
 
-def _temp_block(meth):
+def _temp_block_skip(meth):
     @wraps(meth)
     def _meth(self, *args, **kwargs):
         prev = self._block
         self.block(True)
+        self._skip_response = True
         result = meth(self, *args, **kwargs)
+        self._skip_response = False
         self.block(prev)
         return result
 
@@ -40,22 +42,16 @@ class HistData(EWrapper, EClient):
     ErrResponses = ["No Data", "invalid symbol", "No head time stamp", "timed out"]
     Reqs = {}
     BLACKLIST = []
-    TIMEOUT = 30
-    DEF_CLIENTID = 9999
-    DEF_PORT = 7497
-    DEF_IP = '127.0.0.1'
+    TIMEOUT = 60
 
-    def __init__(self, ip= None, clientid= None, port= None):
-        if clientid is None: clientid = self.DEF_CLIENTID
-        if port is None: port = self.DEF_PORT
-        if ip is None: ip = self.DEF_IP
-
+    def __init__(self, clientId, host= "127.0.0.1", port= 7497):
         EClient.__init__(self, self)
-        self.connect(ip, port, clientid)
+        self.connect(host, port, clientId)
         Thread(target= self.run, daemon= True).start()
         self._block = True
         self.IBTWSConnected = False
         self._threadwait = True
+        self._skip_response = False
         self.today = pd.Timestamp("now").normalize()
 
     ###########################
@@ -102,14 +98,17 @@ class HistData(EWrapper, EClient):
 
     def headTimestamp(self, id_, stamp):
         response = self[id_].setEnd(stamp)
+        if self._skip_response: return
         self.response(response)
 
     def historicalData(self, id_, bar): self[id_] + bar
 
     def historicalDataEnd(self, id_, start, end):
+        logger.debug("HISTORICAL DATA END ------ %s %s %s", id_, start, end)
         if self._blacklist(id_): return
 
         response = self[id_].setEnd(id_, end if end in self.ErrResponses else None)
+        if response is None or self._skip_response: return
         self.response(response)
 
 
@@ -133,7 +132,6 @@ class HistData(EWrapper, EClient):
 
         for req in request:
             self.Reqs[req.id] = request
-
             if self._threadwait: request.event.clear()
             logger.debug("SENDING REQUEST --- %s", req)
             func(*req)
@@ -186,11 +184,11 @@ class HistData(EWrapper, EClient):
         to_return = mid[midix]
         return to_return if to_return.date() != left.date() else mid[midix + 1]
 
-    @_temp_block
+    @_temp_block_skip
     def find_first(self, sym, timeframe):
-        # first try to get a headtimestamp
         resp = Response(sym, timeframe)
 
+        # first try to get a headtimestamp
         left, right = self.getHead(sym), self.today
         attempt = count(1)
         while "timed out" in left.errors and next(attempt) < 3:
