@@ -2,6 +2,7 @@ import pytest
 
 from ibapi.contract import Contract
 from histdata.histdata import Request
+import histdata._utils as u
 
 
 contract1 = Contract()
@@ -28,7 +29,7 @@ contract2.includeExpired = True
 
 
 def test_make_contract(specs, contract):
-    calced = Request.makeContract(specs)
+    calced = u.make_contract(specs)
 
     for att in filter(lambda x: x[0] != "_", dir(contract)):
         assert getattr(calced, att) == getattr(contract, att)
@@ -36,7 +37,7 @@ def test_make_contract(specs, contract):
 
 def test_make_contract_fail():
     with pytest.raises(ValueError):
-        Request.makeContract({"nosym": 1})
+        u.make_contract({"nosym": 1})
 
     with pytest.raises(ValueError):
-        Request.makeContract({"symbol": "amzn", "notvalid": 1})
+        u.make_contract({"symbol": "amzn", "notvalid": 1})

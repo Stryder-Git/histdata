@@ -185,7 +185,7 @@ class HistData(EWrapper, EClient):
 
     @_temp_block_skip
     def find_first(self, sym, timeframe):
-        resp = Response(sym, timeframe)
+        resp = Response(u.make_contract(sym), timeframe)
 
         # first try to get a headtimestamp
         left, right = self.getHead(sym), self.today
@@ -253,7 +253,6 @@ class IBRequest:
     def __repr__(self): return str(self.req)
 
 
-class NotValid: pass
 
 class Request:
     """ holds variables and methods needed to set up the requests
@@ -268,30 +267,6 @@ class Request:
     IBDT = "%Y%m%d %H:%M:%S"
     ratios = dict(s=dt.timedelta(seconds=1), m=dt.timedelta(minutes=1), h=dt.timedelta(hours=1),
                   D=dt.timedelta(minutes=60 * 16), W=dt.timedelta(minutes=60 * 16 * 5), M=dt.timedelta(days=60 * 16 * 20))
-
-    @classmethod
-    def makeContract(cls, symbol):
-        if isinstance(symbol, Contract): return symbol
-
-        contract = Contract()
-
-        if isinstance(symbol, dict):
-            try: contract.symbol = symbol["symbol"]
-            except KeyError as e:
-                raise ValueError("You need a symbol in the contract dictionary") from e
-
-            for att, value in symbol.items():
-                if getattr(contract, att, NotValid) is NotValid:
-                    raise ValueError(f"{att} is not a valid attribute for a Contract")
-
-                setattr(contract, att, value)
-            return contract
-
-        contract.symbol = symbol
-        contract.secType = "STK"
-        contract.currency = "USD"
-        contract.exchange = "SMART"
-        return contract
 
     def set_request_dates(self, start, end):
         """
@@ -341,7 +316,7 @@ class Request:
         return dt.datetime.strftime(dte, cls.IBDT)
 
     def __init__(self, symbol, timeframe, start, end, format_, onlyRTH, type_):
-        self.contract = self.makeContract(symbol)
+        self.contract = u.make_contract(symbol)
         self.response = Response(self.contract, timeframe)
 
         self.start, self.end, self.nstart, self.nend = self.set_request_dates(start, end)
@@ -419,7 +394,7 @@ class Request:
 # noinspection PyMissingConstructor
 class Stamp(Request):
     def __init__(self, symbol, type_, only_rth, format_):
-        self.contract = self.makeContract(symbol)
+        self.contract = u.make_contract(symbol)
         id_ = next(self.id)
         self.ib_requests = {id_: IBRequest(id_, self.contract, type_, only_rth, format_)}
 
