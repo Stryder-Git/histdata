@@ -378,7 +378,6 @@ class Request:
         self.orig_tf = timeframe
         self.data = []
 
-        self._ids = []
         self.ib_requests = {}
         # since the request might need to be split, create each request
         add = (self.nend - self.nstart) / self.nreqs
@@ -388,7 +387,6 @@ class Request:
             duration, end = self.date_duration(thisstart, thisend)[1], self._ib(thisend)
 
             id_ = next(self.id)
-            self._ids.append(id_)
             self.ib_requests[id_] = IBRequest(id_, self.contract, end, duration, self.timeframe,
                                               type_, int(onlyRTH), format_, False, [])
 
@@ -444,11 +442,7 @@ class Request:
         return self.ib_requests[item]
 
     def __iter__(self):
-        self.__ids = iter(self._ids)
-        return self
-
-    def __next__(self):
-        return self[next(self.__ids)]
+        return iter(self.ib_requests.values())
 
 
 # noinspection PyMissingConstructor
