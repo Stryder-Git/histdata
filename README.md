@@ -25,10 +25,7 @@ hd = HistData(1)
 hd.isConnected()
 ```
 
-
-
-
-    True
+True
 
 
 
